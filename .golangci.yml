@@ -1,0 +1,149 @@
+# golangci-lint configuration for DSL Onboarding POC
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+
+issues:
+  # Exclude directories from linting
+  exclude-dirs:
+    - vendor
+    - .claude
+
+  # Exclude rules for specific paths/linters
+  exclude-rules:
+    # Exclude some linters from running on test files
+    - path: _test\.go
+      linters:
+        - dupl
+        - gosec
+        - goconst
+
+    # Exclude linting of generated files
+    - path: \.pb\.go$
+      linters:
+        - all
+
+    # Ignore long lines in comments
+    - linters:
+        - revive
+      text: "line is \\d+ characters"
+      source: "^\\s*//.*$"
+
+  max-issues-per-linter: 50
+  max-same-issues: 3
+  new: false
+  uniq-by-line: true
+
+linters:
+  disable-all: false
+  enable:
+    - errcheck # Check for unchecked errors
+    - gosimple # Simplify code
+    - govet # Reports suspicious constructs
+    - ineffassign # Detect ineffectual assignments
+    - staticcheck # Static analysis checks
+    - unused # Check for unused constants, variables, functions, and types
+    - typecheck # Type-check code
+    - gofmt # Check formatting
+    - goimports # Check import formatting
+    - misspell # Find commonly misspelled English words
+    - revive # Fast, configurable, extensible, flexible linter
+    - gosec # Inspect source code for security problems
+    - bodyclose # Check HTTP response body is closed
+    - unconvert # Remove unnecessary type conversions
+    - goconst # Find repeated strings that could be constants
+    - dupl # Check for duplicate code
+    - gocritic # Comprehensive Go linter
+    - prealloc # Find slice declarations that could be pre-allocated
+    - unparam # Find unused function parameters
+    - whitespace # Check for unnecessary whitespace
+    - errorlint # Find code that causes problems with Go 1.13+ error wrapping
+
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+    exclude-functions:
+      - fmt.Println
+      - fmt.Printf
+
+  govet:
+    enable:
+      - shadow
+    settings:
+      shadow:
+        strict: true
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: dsl-ob-poc
+
+  misspell:
+    locale: US
+
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
+      - name: package-comments
+        severity: warning
+        disabled: true
+      - name: var-naming
+        severity: warning
+        disabled: false
+      - name: indent-error-flow
+        severity: warning
+        disabled: false
+
+  gosec:
+    excludes:
+      - G104 # Audit errors not checked (covered by errcheck)
+    config:
+      G306: "0644"
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  dupl:
+    threshold: 150
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+    disabled-checks:
+      - commentedOutCode
+      - whyNoLint
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: false
+
+  whitespace:
+    multi-if: false
+    multi-func: false
+
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true
+
+severity:
+  default-severity: warning
+  case-sensitive: false
