@@ -25,7 +25,7 @@ type AgentKYCResponse struct {
 	Jurisdictions     []string `json:"jurisdictions"`
 }
 
-// NewAgent initializes the Gemini client. If the API key is empty,
+// NewAgent initializes the Gemini or other client. If the API key is empty,
 // the caller receives a nil Agent and no error so that commands can
 // decide how to handle missing configuration.
 func NewAgent(ctx context.Context, apiKey string) (*Agent, error) {
