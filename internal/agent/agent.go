@@ -19,8 +19,8 @@ type Agent struct {
 	model  *genai.GenerativeModel
 }
 
-// AgentKYCResponse is the structured JSON we expect from the LLM.
-type AgentKYCResponse struct {
+// KYCResponse is the structured JSON we expect from the LLM.
+type KYCResponse struct {
 	RequiredDocuments []string `json:"required_documents"`
 	Jurisdictions     []string `json:"jurisdictions"`
 }
@@ -99,13 +99,18 @@ EXAMPLES:
 	var userPrompt string
 	if len(products) == 0 {
 		userPrompt = fmt.Sprintf(
-			`Nature and Purpose: "%s", Products: []`,
+			`Nature and Purpose: %q, Products: []`,
 			naturePurpose,
 		)
 	} else {
-		productPayload := strings.Join(products, `", "`)
+		// Quote each product individually so the placeholder needn't be wrapped in quotes.
+		quoted := make([]string, len(products))
+		for i, p := range products {
+			quoted[i] = fmt.Sprintf("%q", p)
+		}
+		productPayload := strings.Join(quoted, ", ")
 		userPrompt = fmt.Sprintf(
-			`Nature and Purpose: "%s", Products: ["%s"]`,
+			`Nature and Purpose: %q, Products: [%s]`,
 			naturePurpose,
 			productPayload,
 		)
@@ -130,9 +135,9 @@ EXAMPLES:
 
 	log.Printf("AI Agent Raw Response: %s", textPart)
 
-	var kycResp AgentKYCResponse
-	if err := json.Unmarshal([]byte(textPart), &kycResp); err != nil {
-		return nil, fmt.Errorf("failed to parse agent's JSON response: %w (response was: %s)", err, textPart)
+	var kycResp KYCResponse
+	if uErr := json.Unmarshal([]byte(textPart), &kycResp); uErr != nil {
+		return nil, fmt.Errorf("failed to parse agent's JSON response: %w (response was: %s)", uErr, textPart)
 	}
 
 	return &dsl.KYCRequirements{

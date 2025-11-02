@@ -60,7 +60,7 @@ func TestRunHistory_PrintsHistory(t *testing.T) {
 		t.Errorf("output missing version headers: %s", out)
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("unmet sqlmock expectations: %v", err)
+	if mockErr := mock.ExpectationsWereMet(); mockErr != nil {
+		t.Fatalf("unmet sqlmock expectations: %v", mockErr)
 	}
 }

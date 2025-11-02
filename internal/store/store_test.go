@@ -46,7 +46,7 @@ func TestGetDSLHistory_ReturnsOrderedResults(t *testing.T) {
 		t.Errorf("unexpected second version id: %s", history[1].VersionID)
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("unmet sqlmock expectations: %v", err)
+	if mockErr := mock.ExpectationsWereMet(); mockErr != nil {
+		t.Fatalf("unmet sqlmock expectations: %v", mockErr)
 	}
 }
