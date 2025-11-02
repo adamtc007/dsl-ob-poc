@@ -1,0 +1,22 @@
+# Go build artifacts
+dsl-poc
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Coverage reports
+coverage.out
+coverage.html
+
+# Local build/module caches
+.gocache/
+.gomodcache/
+
+# Lint cache (if present)
+.golangci-lint.cache
+
+# macOS metadata
+.DS_Store
