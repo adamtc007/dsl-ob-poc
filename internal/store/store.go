@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -73,6 +74,11 @@ func NewStore(connString string) (*Store, error) {
 	}
 
 	return &Store{db: db}, nil
+}
+
+// NewStoreFromDB constructs a Store from an existing *sql.DB. Useful for tests.
+func NewStoreFromDB(db *sql.DB) *Store {
+	return &Store{db: db}
 }
 
 // Close closes the database connection.
@@ -345,6 +351,40 @@ func (s *Store) GetLatestDSL(ctx context.Context, cbuID string) (string, error) 
 		return "", fmt.Errorf("failed to get latest DSL: %w", err)
 	}
 	return dslText, nil
+}
+
+// DSLVersion represents a single versioned DSL entry.
+type DSLVersion struct {
+	VersionID string
+	CreatedAt time.Time
+	DSLText   string
+}
+
+// GetDSLHistory returns all DSL versions for a given CBU ID ordered by creation time.
+func (s *Store) GetDSLHistory(ctx context.Context, cbuID string) ([]DSLVersion, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT version_id::text, created_at, dsl_text
+         FROM "kyc-dsl".dsl_ob
+         WHERE cbu_id = $1
+         ORDER BY created_at ASC`, cbuID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query DSL history: %w", err)
+	}
+	defer rows.Close()
+
+	var history []DSLVersion
+	for rows.Next() {
+		var v DSLVersion
+		if scanErr := rows.Scan(&v.VersionID, &v.CreatedAt, &v.DSLText); scanErr != nil {
+			return nil, fmt.Errorf("failed to scan DSL history row: %w", scanErr)
+		}
+		history = append(history, v)
+	}
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("error iterating DSL history: %w", rowsErr)
+	}
+
+	return history, nil
 }
 
 // GetProductByName retrieves a product by name from the catalog.

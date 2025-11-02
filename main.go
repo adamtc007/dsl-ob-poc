@@ -90,6 +90,10 @@ func run() int {
 	case "discover-resources":
 		err = cli.RunDiscoverResources(ctx, dbStore, args)
 
+	// NEW COMMAND
+	case "history":
+		err = cli.RunHistory(ctx, dbStore, args)
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
@@ -105,7 +109,7 @@ func run() int {
 }
 
 func printUsage() {
-	fmt.Println("Onboarding DSL POC CLI (v4: Agent-Aware)")
+	fmt.Println("Onboarding DSL POC CLI (v5: History-Aware)")
 	fmt.Println("Usage: dsl-poc <command> [options]")
 	fmt.Println("\nSetup Commands:")
 	fmt.Println("  init-db                      (One-time) Initializes the PostgreSQL schema and all tables.")
@@ -114,7 +118,9 @@ func printUsage() {
 	fmt.Println("  create --cbu=<cbu-id>        (v1) Creates a new onboarding case.")
 	fmt.Println("  add-products --cbu=<cbu-id>  (v2) Adds products to an existing case.")
 	fmt.Println("               --products=<p1,p2>")
-	fmt.Println("  discover-kyc --cbu=<cbu-id> (v3) Performs AI-assisted KYC discovery.")
+	fmt.Println("  discover-kyc --cbu=<cbu-id>  (v3) Performs AI-assisted KYC discovery.")
 	fmt.Println("  discover-services --cbu=<cbu-id> (v4) Discovers and appends services plan.")
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v5) Discovers and appends resources plan.")
+	fmt.Println("\nUtility Commands:")
+	fmt.Println("  history --cbu=<cbu-id>       Views the full, versioned DSL evolution for a case.")
 }

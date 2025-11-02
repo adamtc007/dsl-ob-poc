@@ -3,6 +3,7 @@ module dsl-ob-poc
 go 1.25.1
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/google/generative-ai-go v0.20.1
 	github.com/lib/pq v1.10.9
 	google.golang.org/api v0.254.0
