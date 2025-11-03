@@ -1,0 +1,290 @@
+package cli
+
+import (
+	"context"
+	"encoding/json/v2"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"dsl-ob-poc/internal/agent"
+	"dsl-ob-poc/internal/datastore"
+)
+
+// RunAgentPromptCapture demonstrates AI agent capabilities with full prompt/response capture
+func RunAgentPromptCapture(ctx context.Context, ds datastore.DataStore, ai *agent.Agent, args []string) error {
+	fs := flag.NewFlagSet("agent-prompt-capture", flag.ExitOnError)
+	cbuID := fs.String("cbu", "", "The CBU ID to test with (optional)")
+	testType := fs.String("type", "all", "Test type: kyc, transform, validate, or all")
+	captureFile := fs.String("output", "", "File to capture prompts and responses (optional)")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("failed to parse flags: %w", err)
+	}
+
+	var outputFile *os.File
+	var err error
+
+	if *captureFile != "" {
+		outputFile, err = os.Create(*captureFile)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		defer outputFile.Close()
+		log.Printf("📁 Capturing prompts and responses to: %s", *captureFile)
+	}
+
+	writeToBoth := func(format string, args ...interface{}) {
+		text := fmt.Sprintf(format, args...)
+		fmt.Print(text)
+		if outputFile != nil {
+			outputFile.WriteString(text)
+		}
+	}
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	writeToBoth("\n🧪 **AI Agent Prompt/Response Capture** - %s\n", timestamp)
+	writeToBoth("=========================================================\n")
+
+	if ai != nil {
+		writeToBoth("🔗 **Mode**: Real AI Agent (Google Gemini)\n")
+	} else {
+		writeToBoth("🤖 **Mode**: Mock Agent (Simulated Responses)\n")
+		// Create mock agent for testing
+		mockAgent := agent.NewMockAgent()
+		ai = &agent.Agent{} // Cast mock to interface - this is just for demonstration
+		_ = mockAgent
+	}
+
+	// Get CBU and DSL state
+	finalCBUID := *cbuID
+	if finalCBUID == "" {
+		finalCBUID = "CBU-1234" // Default test CBU
+	}
+
+	writeToBoth("📋 **Test Configuration**:\n")
+	writeToBoth("   CBU ID: %s\n", finalCBUID)
+	writeToBoth("   Test Type: %s\n", *testType)
+	writeToBoth("\n")
+
+	currentDSLState, err := ds.GetLatestDSLWithState(ctx, finalCBUID)
+	if err != nil {
+		return fmt.Errorf("failed to get current DSL state: %w", err)
+	}
+
+	writeToBoth("📄 **Current DSL State**:\n")
+	writeToBoth("   State: %s\n", currentDSLState.OnboardingState)
+	writeToBoth("   Version: %d\n", currentDSLState.VersionNumber)
+	writeToBoth("   DSL Length: %d characters\n\n", len(currentDSLState.DSLText))
+
+	// Test KYC Agent with prompt capture
+	if *testType == "all" || *testType == "kyc" {
+		writeToBoth("🔍 **KYC Agent Prompt/Response Capture**\n")
+		writeToBoth("=======================================\n")
+
+		scenarios := []struct {
+			name        string
+			nature      string
+			products    []string
+			description string
+		}{
+			{
+				name:        "UCITS Fund",
+				nature:      "UCITS equity fund domiciled in LU",
+				products:    []string{"CUSTODY", "FUND_ACCOUNTING"},
+				description: "European regulated investment fund requiring Luxembourg compliance",
+			},
+			{
+				name:        "US Hedge Fund",
+				nature:      "US-based hedge fund",
+				products:    []string{"PRIME_BROKERAGE", "TRANSFER_AGENT"},
+				description: "Alternative investment vehicle requiring US regulatory compliance",
+			},
+		}
+
+		for i, scenario := range scenarios {
+			writeToBoth("\n**Scenario %d: %s**\n", i+1, scenario.name)
+			writeToBoth("📝 Nature: %s\n", scenario.nature)
+			writeToBoth("📦 Products: %v\n", scenario.products)
+
+			// Show the system prompt that would be used
+			writeToBoth("\n📤 **System Prompt to AI**:\n")
+			writeToBoth("```\n")
+			systemPrompt := `You are an expert KYC/AML Compliance Officer for a major global bank.
+Your job is to analyze a new client's "nature and purpose" and their "requested products" to determine the *minimum* required KYC documents and all relevant jurisdictions.
+
+RULES:
+1. Analyze the "nature and purpose" for entity type and domicile (e.g., "UCITS fund domiciled in LU" -> Domicile is "LU").
+2. Analyze the products for regulatory impact (e.g., "TRANSFER_AGENT" implies AML checks on investors).
+3. Respond ONLY with a single, minified JSON object. Do not include markdown ticks, "json", or any other conversational text.
+4. The JSON format MUST be: {"required_documents": ["doc1", "doc2"], "jurisdictions": ["jur1", "jur2"]}
+
+EXAMPLES:
+- Input: "UCITS equity fund domiciled in LU", Products: ["CUSTODY"]
+- Output: {"required_documents":["CertificateOfIncorporation","ArticlesOfAssociation","W8BEN-E"],"jurisdictions":["LU"]}
+- Input: "US-based hedge fund", Products: ["TRANSFER_AGENT", "CUSTODY"]
+- Output: {"required_documents":["CertificateOfLimitedPartnership","PartnershipAgreement","W9","AMLPolicy"],"jurisdictions":["US"]}`
+			writeToBoth("%s\n", systemPrompt)
+			writeToBoth("```\n")
+
+			// Show the user prompt
+			var userPrompt string
+			if len(scenario.products) == 0 {
+				userPrompt = fmt.Sprintf(`Nature and Purpose: "%s", Products: []`, scenario.nature)
+			} else {
+				quoted := make([]string, len(scenario.products))
+				for j, p := range scenario.products {
+					quoted[j] = fmt.Sprintf(`"%s"`, p)
+				}
+				userPrompt = fmt.Sprintf(`Nature and Purpose: "%s", Products: [%s]`, scenario.nature, fmt.Sprintf("%s", quoted))
+			}
+
+			writeToBoth("\n📤 **User Prompt to AI**:\n")
+			writeToBoth("```\n%s```\n", userPrompt)
+
+			// Call mock KYC agent and show response
+			mockAgent := agent.NewMockAgent()
+			kycReqs, err := mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
+			if err != nil {
+				writeToBoth("❌ Error: %v\n\n", err)
+				continue
+			}
+
+			// Show the expected AI response format
+			expectedResponse := map[string]interface{}{
+				"required_documents": kycReqs.Documents,
+				"jurisdictions":      kycReqs.Jurisdictions,
+			}
+			responseJSON, _ := json.Marshal(expectedResponse)
+
+			writeToBoth("\n📥 **Expected AI Response**:\n")
+			writeToBoth("```json\n%s\n```\n", string(responseJSON))
+
+			writeToBoth("\n✅ **Parsed Result**:\n")
+			writeToBoth("   📄 Documents: %v\n", kycReqs.Documents)
+			writeToBoth("   🌍 Jurisdictions: %v\n\n", kycReqs.Jurisdictions)
+		}
+	}
+
+	// Test DSL Transformation Agent with prompt capture
+	if *testType == "all" || *testType == "transform" {
+		writeToBoth("\n🔄 **DSL Transformation Agent Prompt/Response Capture**\n")
+		writeToBoth("====================================================\n")
+
+		instruction := "Add TRANSFER_AGENT to the products list"
+
+		writeToBoth("\n📝 **Transformation Instruction**: %s\n", instruction)
+
+		request := agent.DSLTransformationRequest{
+			CurrentDSL:  currentDSLState.DSLText,
+			Instruction: instruction,
+			TargetState: string(currentDSLState.OnboardingState),
+			Context: map[string]interface{}{
+				"current_state":  currentDSLState.OnboardingState,
+				"version_number": currentDSLState.VersionNumber,
+			},
+		}
+
+		// Show the system prompt
+		writeToBoth("\n📤 **System Prompt to AI**:\n")
+		writeToBoth("```\n")
+		systemPrompt := `You are an expert DSL (Domain Specific Language) architect for financial onboarding workflows.
+Your role is to analyze existing DSL and transform it according to user instructions while maintaining correctness and consistency.
+
+RULES:
+1. Analyze the current DSL structure and understand its semantic meaning
+2. Apply the requested transformation while preserving DSL syntax and structure
+3. Ensure all changes are consistent with the target onboarding state
+4. Provide clear explanations for all changes made
+5. Respond ONLY with a single, well-formed JSON object
+6. Do not include markdown, code blocks, or conversational text
+
+DSL SYNTAX GUIDE:
+- S-expressions format: (command args...)
+- Case creation: (case.create (cbu.id "ID") (nature-purpose "DESC"))
+- Products: (products.add "PRODUCT1" "PRODUCT2")
+- KYC: (kyc.start (documents (document "DOC")) (jurisdictions (jurisdiction "JUR")))
+- Services: (services.discover (for.product "PROD" (service "SVC")))
+- Resources: (resources.plan (resource.create "NAME" (owner "OWNER") (var (attr-id "ID"))))
+- Values: (values.bind (bind (attr-id "ID") (value "VAL")))
+
+RESPONSE FORMAT:
+{
+  "new_dsl": "Complete transformed DSL as a string",
+  "explanation": "Clear explanation of what was changed and why",
+  "changes": ["List of specific changes made"],
+  "confidence": 0.95
+}`
+		writeToBoth("%s\n", systemPrompt)
+		writeToBoth("```\n")
+
+		// Show the user prompt
+		contextJSON, _ := json.Marshal(request.Context)
+		userPrompt := fmt.Sprintf(`Current DSL:
+%s
+
+Instruction: %s
+Target State: %s
+
+Additional Context: %s
+
+Please transform the DSL according to the instruction while moving toward the target state.`,
+			request.CurrentDSL,
+			request.Instruction,
+			request.TargetState,
+			string(contextJSON))
+
+		writeToBoth("\n📤 **User Prompt to AI**:\n")
+		writeToBoth("```\n%s\n```\n", userPrompt)
+
+		// Call mock transformation agent
+		mockAgent := agent.NewMockAgent()
+		response, err := mockAgent.CallDSLTransformationAgent(ctx, request)
+		if err != nil {
+			writeToBoth("❌ Error: %v\n", err)
+		} else {
+			// Show expected response
+			responseJSON, _ := json.Marshal(response)
+			writeToBoth("\n📥 **Expected AI Response**:\n")
+			writeToBoth("```json\n%s\n```\n", string(responseJSON))
+
+			writeToBoth("\n✅ **Parsed Result**:\n")
+			writeToBoth("   📊 Confidence: %.2f\n", response.Confidence)
+			writeToBoth("   📝 Explanation: %s\n", response.Explanation)
+			writeToBoth("   🔄 Changes: %v\n", response.Changes)
+			writeToBoth("\n📄 **Transformed DSL** (first 300 chars):\n")
+			if len(response.NewDSL) > 300 {
+				writeToBoth("```\n%s...\n```\n", response.NewDSL[:300])
+			} else {
+				writeToBoth("```\n%s\n```\n", response.NewDSL)
+			}
+		}
+	}
+
+	writeToBoth("\n🎯 **Summary**:\n")
+	writeToBoth("- This capture shows the exact prompts sent to AI agents\n")
+	writeToBoth("- System prompts define the AI's role and response format\n")
+	writeToBoth("- User prompts contain the specific data and instructions\n")
+	writeToBoth("- Responses are structured JSON for reliable parsing\n")
+
+	if *captureFile != "" {
+		writeToBoth("\n📁 **Output saved to**: %s\n", *captureFile)
+	}
+
+	return nil
+}
+
+// Helper function to safely convert context to JSON string
+func jsonString(v interface{}) string {
+	if v == nil {
+		return "{}"
+	}
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		return "{}"
+	}
+
+	return string(data)
+}

@@ -124,6 +124,15 @@ func run() int {
 	case "agent-test":
 		err = cli.RunAgentTest(ctx, dataStore, args)
 
+	case "agent-prompt-capture":
+		apiKey := os.Getenv("GEMINI_API_KEY")
+		aiAgent, agentErr := agent.NewAgent(ctx, apiKey)
+		if agentErr != nil {
+			log.Printf("Failed to initialize AI agent: %v", agentErr)
+		}
+		// Allow running with or without API key for prompt capture demonstration
+		err = cli.RunAgentPromptCapture(ctx, dataStore, aiAgent, args)
+
 	case "discover-services":
 		err = cli.RunDiscoverServices(ctx, dataStore, args)
 
@@ -208,6 +217,8 @@ func printUsage() {
 	fmt.Println("  agent-demo [--cbu=<cbu-id>]      Demonstrates AI agent capabilities (no API key required)")
 	fmt.Println("  agent-test [--cbu=<cbu-id>]      Tests AI agents with mock responses (no API key required)")
 	fmt.Println("             [--type=<kyc|transform|validate|all>]")
+	fmt.Println("  agent-prompt-capture [--cbu=<cbu-id>] [--type=<kyc|transform|validate|all>] [--output=<file>]")
+	fmt.Println("                       Captures and displays exact AI prompts and responses for analysis")
 	fmt.Println("\nCBU Management Commands:")
 	fmt.Println("  cbu-create --name=<name> [--description=<desc>] [--nature-purpose=<purpose>]")
 	fmt.Println("  cbu-list                     Lists all CBUs")

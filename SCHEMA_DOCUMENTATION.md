@@ -10,7 +10,8 @@ Database schema for the DSL Onboarding POC implementing an immutable, versioned 
 
 ```
 Event Sourcing Core
-├── dsl_ob (immutable versioned DSL records)
+├── dsl_ob (immutable versioned DSL records with state management)
+├── onboarding_sessions (active onboarding lifecycle tracking)
 ├── attribute_values (runtime values with versioning)
 
 Catalog Tables
@@ -37,17 +38,53 @@ Data Dictionary
 ## Core Tables
 
 ### `dsl_ob` - Event Sourcing Core
-Immutable versioned DSL records implementing event sourcing pattern.
+Immutable versioned DSL records implementing event sourcing pattern with onboarding state management.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | version_id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique version identifier |
 | cbu_id | VARCHAR(255) | NOT NULL | Client Business Unit identifier |
 | dsl_text | TEXT | NOT NULL | S-expression DSL content |
+| onboarding_state | VARCHAR(50) | DEFAULT 'CREATED' | Current onboarding state |
+| version_number | INTEGER | DEFAULT 1, AUTO-INCREMENT | Sequential version number per CBU |
 | created_at | TIMESTAMPTZ | DEFAULT (now() at time zone 'utc') | Creation timestamp |
+
+**Onboarding States:**
+- `CREATED` - Initial case creation
+- `PRODUCTS_ADDED` - Products have been added
+- `KYC_DISCOVERED` - KYC requirements discovered
+- `SERVICES_DISCOVERED` - Services have been discovered
+- `RESOURCES_DISCOVERED` - Resources have been discovered
+- `ATTRIBUTES_POPULATED` - Attributes have been populated
+- `COMPLETED` - Onboarding process completed
 
 **Indexes:**
 - `idx_dsl_ob_cbu_id_created_at` - Composite index (cbu_id, created_at DESC) for fast latest lookups
+- `idx_dsl_ob_state_version` - Composite index (cbu_id, onboarding_state, version_number DESC) for state queries
+
+**Triggers:**
+- `trigger_update_dsl_version` - Auto-increments version_number for each CBU on INSERT
+
+### `onboarding_sessions` - Active Onboarding Lifecycle Tracking
+Tracks active onboarding sessions and their current state progression (one per CBU).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| onboarding_id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique onboarding session identifier |
+| cbu_id | VARCHAR(255) | NOT NULL, UNIQUE | Client Business Unit identifier (one session per CBU) |
+| current_state | VARCHAR(50) | NOT NULL, DEFAULT 'CREATED' | Current onboarding state |
+| current_version | INTEGER | NOT NULL, DEFAULT 1 | Current DSL version number |
+| latest_dsl_version_id | UUID | FK to dsl_ob(version_id) | Reference to latest DSL version |
+| created_at | TIMESTAMPTZ | DEFAULT (now() at time zone 'utc') | Session creation timestamp |
+| updated_at | TIMESTAMPTZ | DEFAULT (now() at time zone 'utc') | Last update timestamp |
+
+**Indexes:**
+- `idx_onboarding_sessions_cbu_id` - Fast CBU lookups
+- `idx_onboarding_sessions_state` - State-based queries for workflow management
+
+**Constraints:**
+- `UNIQUE (cbu_id)` - Ensures one active onboarding session per CBU
+- `FK latest_dsl_version_id` - References the most recent DSL version
 
 ### `attribute_values` - Runtime Values
 Stores resolved attribute values with versioning for deterministic DSL generation.
@@ -278,6 +315,46 @@ Central data dictionary with JSONB metadata for rich attribute definitions.
 **Constraints:**
 - `PRIMARY KEY (service_id, resource_id)`
 
+## Database Functions and Triggers
+
+### Version Management Functions
+
+#### `update_dsl_version_number()` Function
+Automatically calculates and assigns the next sequential version number for DSL records.
+
+```sql
+CREATE OR REPLACE FUNCTION "dsl-ob-poc".update_dsl_version_number()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Get the next version number for this CBU
+    SELECT COALESCE(MAX(version_number), 0) + 1
+    INTO NEW.version_number
+    FROM "dsl-ob-poc".dsl_ob
+    WHERE cbu_id = NEW.cbu_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Purpose**: Ensures immutable versioning with automatic sequential numbering per CBU.
+
+#### `trigger_update_dsl_version` Trigger
+Executes the version numbering function before each INSERT on the `dsl_ob` table.
+
+```sql
+CREATE TRIGGER trigger_update_dsl_version
+    BEFORE INSERT ON "dsl-ob-poc".dsl_ob
+    FOR EACH ROW
+    EXECUTE FUNCTION "dsl-ob-poc".update_dsl_version_number();
+```
+
+**Benefits:**
+- **Automatic Versioning**: No manual version management required
+- **Data Consistency**: Prevents version conflicts and gaps
+- **Audit Trail**: Complete historical progression tracking
+- **Immutable Records**: Each state change creates a new versioned record
+
 ## Performance Optimizations
 
 ### Indexing Strategy
@@ -287,6 +364,8 @@ Central data dictionary with JSONB metadata for rich attribute definitions.
 
 ### Query Patterns
 - **Latest DSL lookup**: `(cbu_id, created_at DESC)` index
+- **State-based queries**: `(cbu_id, onboarding_state, version_number DESC)` index
+- **Onboarding session tracking**: `(cbu_id)` index on onboarding_sessions
 - **Attribute resolution**: `(cbu_id, attribute_id, dsl_version)` index
 - **Entity relationships**: Multi-table JOINs through relationship tables
 
