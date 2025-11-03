@@ -20,6 +20,3 @@ coverage.html
 
 # macOS metadata
 .DS_Store
-
-# Archives
-*.zip
