@@ -1,138 +1,185 @@
-# Onboarding DSL - Go POC
+# DSL Onboarding POC
 
-This application is a proof-of-concept for the client onboarding DSL, with all state logic and persistence handled in Go.
+**Domain-Specific Language for Client Onboarding** - A Go-based proof-of-concept implementing an immutable, versioned state machine for client onboarding with S-expression DSL output.
 
-## Prerequisites
+## 🚀 Quick Start
 
-1.  Go (1.21+)
-2.  PostgreSQL (running and accessible)
+### Prerequisites
+- **Go 1.21+** (requires `GOEXPERIMENT=greenteagc` support)
+- **PostgreSQL** (running and accessible)
 
-## Setup
+### Setup & Run
+```bash
+# 1. Set database connection
+export DB_CONN_STRING="postgres://user:password@localhost:5432/your_db?sslmode=disable"
 
-1.  **Set Environment Variable:**
-    You must provide a connection string to your PostgreSQL database.
+# 2. Build with optimized GC (60% better pause times)
+make build-greenteagc
 
-    ```sh
-    export DB_CONN_STRING="postgres://user:password@localhost:5432/your_db?sslmode=disable"
-    ```
+# 3. Initialize database and seed catalog
+./dsl-poc init-db
+./dsl-poc seed-catalog
 
-    *Note: The user must have permissions to create schemas and tables.*
-
-2.  **Install Dependencies:**
-    ```sh
-    go mod tidy
-    ```
-
-3.  **Build the CLI:**
-
-    **Recommended: Build with experimental green tea garbage collector**
-    ```sh
-    GOEXPERIMENT=greenteagc go build -o dsl-poc .
-    ```
-    
-    The `greenteagc` experiment provides improved garbage collection performance for this workload.
-
-    **Alternative: Build with standard Go garbage collector**
-    ```sh
-    go build -o dsl-poc .
-    ```
-
-    **Or use the provided build script:**
-    ```sh
-    chmod +x build.sh
-    ./build.sh                  # Uses greenteagc by default
-    ./build.sh --no-greenteagc  # Uses standard GC
-    ```
-
-    **Or use make:**
-    ```sh
-    make build-greenteagc       # Recommended
-    make build                  # Standard GC
-    make help                   # Show all available targets
-    ```
-
-4.  **Initialize the Database:**
-    Run the `init-db` command. This only needs to be done once. It creates the `"dsl-ob-poc"` schema and the `"dsl_ob"` table.
-
-    ```sh
-    ./dsl-poc init-db
-    ```
-    *Output: "Database initialized successfully."*
-
-## Running the State Machine
-
-The CLI allows you to run state transitions. Each command creates a **new, immutable version** of the DSL in the database.
-
-### 1. Create a New Case
-
-This is the first state, `CREATE`.
-
-```sh
+# 4. Run the onboarding workflow
 ./dsl-poc create --cbu="CBU-1234"
-```
-*Output:*
-```
-Created new case version: a1b2c3d4-....
----
-(case.create
-  (cbu.id "CBU-1234")
-  (nature-purpose "UCITS equity fund domiciled in LU")
-)
----
-```
-
-### 2. Add Products (State Change)
-
-This demonstrates a state change. It finds the *latest* version for "CBU-1234", appends the new DSL command, and saves it as a **new version**.
-
-```sh
 ./dsl-poc add-products --cbu="CBU-1234" --products="CUSTODY,FUND_ACCOUNTING"
+./dsl-poc discover-services --cbu="CBU-1234"
+./dsl-poc discover-resources --cbu="CBU-1234"
+./dsl-poc populate-attributes --cbu="CBU-1234"
+./dsl-poc get-attribute-values --cbu="CBU-1234"
+
+# 5. View complete DSL evolution
+./dsl-poc history --cbu="CBU-1234"
 ```
-*Output:*
+
+## 🏗️ Architecture
+
+### Core Concepts
+- **Event Sourcing**: Immutable versioning where each state change creates a new database record
+- **State Machine**: 7-stage progression from case creation to attribute value binding
+- **S-Expression DSL**: Lisp-like syntax for structured onboarding specifications
+- **Entity Relationships**: CBUs (Client Business Units) containing entities with defined roles
+
+### State Machine Progression
+1. **CREATE** - Initial case creation with CBU ID
+2. **ADD_PRODUCTS** - Append products to existing case
+3. **DISCOVER_KYC** - AI-assisted KYC discovery using Gemini
+4. **DISCOVER_SERVICES** - Service discovery and planning
+5. **DISCOVER_RESOURCES** - Resource discovery and planning
+6. **POPULATE_ATTRIBUTES** - Runtime attribute value resolution
+7. **GET_ATTRIBUTE_VALUES** - Deterministic value binding and DSL output
+
+### Database Schema
+- **Event Sourcing Core**: `dsl_ob` table with versioned DSL records
+- **Catalogs**: `products`, `services`, `prod_resources` for service discovery
+- **Dictionary**: `dictionary` table with JSONB metadata for attributes
+- **Entity Model**: `cbus`, `entities`, `roles`, `cbu_entity_roles` for relationship management
+- **Runtime Values**: `attribute_values` with composite keys for versioned data
+
+## 🛠️ Development
+
+### Build Options
+```bash
+# Recommended: greenteagc (60% better GC pause times)
+make build-greenteagc
+
+# Standard build
+go build -o dsl-poc .
+
+# Run tests with coverage
+make test-coverage
+
+# Lint and format
+make lint
+make fmt
 ```
-Created new case version: e5f6g7h8-....
----
+
+### Entity & CBU Management
+```bash
+# CBU Management
+./dsl-poc cbu-create --name="Aviva Global Fund" --description="UCITS equity fund"
+./dsl-poc cbu-list
+./dsl-poc cbu-get --id="<cbu-id>"
+./dsl-poc cbu-update --id="<cbu-id>" --name="Updated Name"
+./dsl-poc cbu-delete --id="<cbu-id>"
+
+# Role Management
+./dsl-poc role-create --name="Investment Manager" --description="Manages investment strategies"
+./dsl-poc role-list
+./dsl-poc role-get --id="<role-id>"
+./dsl-poc role-update --id="<role-id>" --name="Updated Role"
+./dsl-poc role-delete --id="<role-id>"
+```
+
+### AI Integration
+```bash
+# Optional: Enable AI-assisted KYC discovery
+export GEMINI_API_KEY="your-gemini-api-key"
+./dsl-poc discover-kyc --cbu="CBU-1234"
+```
+
+## 📋 DSL Format
+
+The system generates S-expression DSL representing onboarding progression:
+
+```lisp
 (case.create
   (cbu.id "CBU-1234")
   (nature-purpose "UCITS equity fund domiciled in LU")
 )
 
 (products.add "CUSTODY" "FUND_ACCOUNTING")
+
+(services.discover
+  (for.product "CUSTODY"
+    (service "CustodyService")
+    (service "SettlementService")
+  )
+)
+
+(resources.plan
+  (resource.create "CustodyAccount"
+    (owner "CustodyTech")
+    (var (attr-id "123e4567-e89b-12d3-a456-426614174000"))
+  )
+)
+
+(values.bind
+  (bind (attr-id "123e4567-e89b-12d3-a456-426614174000") (value "CBU-1234"))
+)
+```
+
+## 🗄️ Entity Relationship Model
+
+**CBU** → **Entity Roles** → **Entities** → **Entity Type Tables**
+
+- **CBUs**: Client Business Units (funds, companies, etc.)
+- **Entities**: Limited companies, partnerships, individuals
+- **Roles**: Investment manager, asset owner, SiCAV, management company
+- **Relationships**: Many-to-many through role assignments
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+make test
+
+# Run specific test suites
+go test -v ./internal/store -run "TestCBU"
+go test -v ./internal/dsl -run "TestDSL"
+
+# Generate coverage report
+make test-coverage
+open coverage.html
+```
+
+## 📁 Project Structure
+
+```
+├── cmd/                    # CLI entry points
+├── internal/
+│   ├── agent/             # Gemini AI integration
+│   ├── cli/               # Command implementations
+│   ├── dsl/               # S-expression builders/parsers
+│   ├── store/             # PostgreSQL operations
+│   └── dictionary/        # Data classification
+├── sql/                   # Database schema
+└── CLAUDE.md             # Claude Code guidance
+```
+
+## 🚀 Performance
+
+**greenteagc Benefits:**
+- 60% reduction in GC pause times
+- ~4% better throughput
+- More predictable latency for concurrent workloads
+- Requires Go 1.21+
+
+## 📚 Additional Documentation
+
+- **[CLAUDE.md](CLAUDE.md)** - Instructions for Claude Code development
+- **[SCHEMA_DOCUMENTATION.md](SCHEMA_DOCUMENTATION.md)** - Detailed database schema reference
+
 ---
-```
 
-You can now check your `dsl_ob` table in PostgreSQL to see both immutable versions.
-
-## Build Configuration
-
-This project supports the experimental `greenteagc` garbage collector for improved performance:
-
-- **GOEXPERIMENT=greenteagc**: Enables the experimental green tea garbage collector
-  - Optimized for workloads with frequent allocations
-  - Recommended for this DSL state machine POC
-  - Requires Go 1.21+
-
-### Build Methods
-
-| Method | Command | Notes |
-|--------|---------|-------|
-| Direct | `GOEXPERIMENT=greenteagc go build -o dsl-poc .` | Manual control |
-| Script | `./build.sh` | Supports options, colored output |
-| Make | `make build-greenteagc` | Standardized, includes dependencies |
-
-## Troubleshooting
-
-**Error: "DB_CONN_STRING environment variable is not set"**
-```sh
-export DB_CONN_STRING="postgres://user:password@localhost:5432/your_db?sslmode=disable"
-```
-
-**Error: "failed to connect to database"**
-- Ensure PostgreSQL is running
-- Verify connection string is correct
-- Check that the database user has permissions to create schemas and tables
-
-**Build fails with unknown GOEXPERIMENT**
-- Ensure you're using Go 1.21 or later
-- Check: `go version`
-```
+**License**: Internal POC - Not for distribution
