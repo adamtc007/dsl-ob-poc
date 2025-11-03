@@ -12,6 +12,18 @@ import (
 	"dsl-ob-poc/internal/datastore"
 )
 
+// getAPIKey looks for GEMINI_API_KEY first, then falls back to GOOGLE_API_KEY
+func getAPIKey() string {
+	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
+		return apiKey
+	}
+	if apiKey := os.Getenv("GOOGLE_API_KEY"); apiKey != "" {
+		log.Println("ℹ️ Using GOOGLE_API_KEY for Gemini API (consider setting GEMINI_API_KEY)")
+		return apiKey
+	}
+	return ""
+}
+
 func main() {
 	os.Exit(run())
 }
@@ -74,14 +86,14 @@ func run() int {
 		err = cli.RunAddProducts(ctx, dataStore, args)
 
 	case "discover-kyc":
-		apiKey := os.Getenv("GEMINI_API_KEY")
+		apiKey := getAPIKey()
 		aiAgent, agentErr := agent.NewAgent(ctx, apiKey)
 		if agentErr != nil {
 			log.Printf("Failed to initialize AI agent: %v", agentErr)
 			return 1
 		}
 		if aiAgent == nil {
-			log.Println("Error: GEMINI_API_KEY environment variable is not set.")
+			log.Println("Error: Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
 			return 1
 		}
 		defer aiAgent.Close()
@@ -89,14 +101,14 @@ func run() int {
 		err = cli.RunDiscoverKYC(ctx, dataStore, aiAgent, args)
 
 	case "agent-transform":
-		apiKey := os.Getenv("GEMINI_API_KEY")
+		apiKey := getAPIKey()
 		aiAgent, agentErr := agent.NewAgent(ctx, apiKey)
 		if agentErr != nil {
 			log.Printf("Failed to initialize AI agent: %v", agentErr)
 			return 1
 		}
 		if aiAgent == nil {
-			log.Println("Error: GEMINI_API_KEY environment variable is not set.")
+			log.Println("Error: Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
 			return 1
 		}
 		defer aiAgent.Close()
@@ -104,14 +116,14 @@ func run() int {
 		err = cli.RunAgentTransform(ctx, dataStore, aiAgent, args)
 
 	case "agent-validate":
-		apiKey := os.Getenv("GEMINI_API_KEY")
+		apiKey := getAPIKey()
 		aiAgent, agentErr := agent.NewAgent(ctx, apiKey)
 		if agentErr != nil {
 			log.Printf("Failed to initialize AI agent: %v", agentErr)
 			return 1
 		}
 		if aiAgent == nil {
-			log.Println("Error: GEMINI_API_KEY environment variable is not set.")
+			log.Println("Error: Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
 			return 1
 		}
 		defer aiAgent.Close()
@@ -125,7 +137,7 @@ func run() int {
 		err = cli.RunAgentTest(ctx, dataStore, args)
 
 	case "agent-prompt-capture":
-		apiKey := os.Getenv("GEMINI_API_KEY")
+		apiKey := getAPIKey()
 		aiAgent, agentErr := agent.NewAgent(ctx, apiKey)
 		if agentErr != nil {
 			log.Printf("Failed to initialize AI agent: %v", agentErr)

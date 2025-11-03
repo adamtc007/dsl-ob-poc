@@ -1,0 +1,8 @@
+
+🧪 **AI Agent Prompt/Response Capture** - 2025-11-03 20:33:07
+=========================================================
+🔗 **Mode**: Real AI Agent (Google Gemini)
+📋 **Test Configuration**:
+   CBU ID: CBU-1234
+   Test Type: kyc
+
