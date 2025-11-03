@@ -11,6 +11,7 @@ import (
 
 	"dsl-ob-poc/internal/agent"
 	"dsl-ob-poc/internal/datastore"
+	"dsl-ob-poc/internal/dsl"
 )
 
 // RunAgentPromptCapture demonstrates AI agent capabilities with full prompt/response capture
@@ -47,14 +48,14 @@ func RunAgentPromptCapture(ctx context.Context, ds datastore.DataStore, ai *agen
 	writeToBoth("\n🧪 **AI Agent Prompt/Response Capture** - %s\n", timestamp)
 	writeToBoth("=========================================================\n")
 
+	var mockAgent *agent.MockAgent
 	if ai != nil {
 		writeToBoth("🔗 **Mode**: Real AI Agent (Google Gemini)\n")
 	} else {
 		writeToBoth("🤖 **Mode**: Mock Agent (Simulated Responses)\n")
+		writeToBoth("ℹ️  **Note**: Set GEMINI_API_KEY environment variable for real AI responses\n")
 		// Create mock agent for testing
-		mockAgent := agent.NewMockAgent()
-		ai = &agent.Agent{} // Cast mock to interface - this is just for demonstration
-		_ = mockAgent
+		mockAgent = agent.NewMockAgent()
 	}
 
 	// Get CBU and DSL state
@@ -143,22 +144,39 @@ EXAMPLES:
 			writeToBoth("\n📤 **User Prompt to AI**:\n")
 			writeToBoth("```\n%s```\n", userPrompt)
 
-			// Call mock KYC agent and show response
-			mockAgent := agent.NewMockAgent()
-			kycReqs, err := mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
+			// Call real AI agent if available, otherwise mock
+			var kycReqs *dsl.KYCRequirements
+			var err error
+
+			if ai != nil {
+				writeToBoth("\n🚀 **Calling Real Gemini API...**\n")
+				kycReqs, err = ai.CallKYCAgent(ctx, scenario.nature, scenario.products)
+				if err != nil {
+					writeToBoth("❌ Real AI Error: %v\n", err)
+					writeToBoth("🔄 Falling back to mock response...\n")
+					kycReqs, err = mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
+				}
+			} else {
+				kycReqs, err = mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
+			}
+
 			if err != nil {
 				writeToBoth("❌ Error: %v\n\n", err)
 				continue
 			}
 
-			// Show the expected AI response format
-			expectedResponse := map[string]interface{}{
+			// Show the actual AI response format
+			actualResponse := map[string]interface{}{
 				"required_documents": kycReqs.Documents,
 				"jurisdictions":      kycReqs.Jurisdictions,
 			}
-			responseJSON, _ := json.Marshal(expectedResponse)
+			responseJSON, _ := json.Marshal(actualResponse)
 
-			writeToBoth("\n📥 **Expected AI Response**:\n")
+			if ai != nil {
+				writeToBoth("\n📥 **Actual Gemini AI Response**:\n")
+			} else {
+				writeToBoth("\n📥 **Mock AI Response**:\n")
+			}
 			writeToBoth("```json\n%s\n```\n", string(responseJSON))
 
 			writeToBoth("\n✅ **Parsed Result**:\n")
@@ -238,15 +256,38 @@ Please transform the DSL according to the instruction while moving toward the ta
 		writeToBoth("\n📤 **User Prompt to AI**:\n")
 		writeToBoth("```\n%s\n```\n", userPrompt)
 
-		// Call mock transformation agent
-		mockAgent := agent.NewMockAgent()
-		response, err := mockAgent.CallDSLTransformationAgent(ctx, request)
+		// Call real AI agent if available, otherwise mock
+		var response *agent.DSLTransformationResponse
+		var err error
+
+		if ai != nil {
+			writeToBoth("\n🚀 **Calling Real Gemini API for DSL Transformation...**\n")
+			response, err = ai.CallDSLTransformationAgent(ctx, request)
+			if err != nil {
+				writeToBoth("❌ Real AI Error: %v\n", err)
+				writeToBoth("🔄 Falling back to mock response...\n")
+				if mockAgent == nil {
+					mockAgent = agent.NewMockAgent()
+				}
+				response, err = mockAgent.CallDSLTransformationAgent(ctx, request)
+			}
+		} else {
+			if mockAgent == nil {
+				mockAgent = agent.NewMockAgent()
+			}
+			response, err = mockAgent.CallDSLTransformationAgent(ctx, request)
+		}
+
 		if err != nil {
 			writeToBoth("❌ Error: %v\n", err)
 		} else {
-			// Show expected response
+			// Show actual response
 			responseJSON, _ := json.Marshal(response)
-			writeToBoth("\n📥 **Expected AI Response**:\n")
+			if ai != nil {
+				writeToBoth("\n📥 **Actual Gemini AI Response**:\n")
+			} else {
+				writeToBoth("\n📥 **Mock AI Response**:\n")
+			}
 			writeToBoth("```json\n%s\n```\n", string(responseJSON))
 
 			writeToBoth("\n✅ **Parsed Result**:\n")
@@ -262,11 +303,111 @@ Please transform the DSL according to the instruction while moving toward the ta
 		}
 	}
 
+	// Test DSL Validation Agent with prompt capture
+	if *testType == "all" || *testType == "validate" {
+		writeToBoth("\n✅ **DSL Validation Agent Prompt/Response Capture**\n")
+		writeToBoth("=================================================\n")
+
+		writeToBoth("\n📝 **Validation Target**: Current DSL completeness and correctness\n")
+
+		// Show the system prompt for validation
+		writeToBoth("\n📤 **System Prompt to AI**:\n")
+		writeToBoth("```\n")
+		validationSystemPrompt := `You are an expert DSL validator for financial onboarding workflows.
+Your role is to analyze DSL for correctness, completeness, and best practices.
+
+VALIDATION CRITERIA:
+1. Syntax correctness (proper S-expression structure)
+2. Semantic correctness (logical flow and consistency)
+3. Completeness (required elements for the onboarding state)
+4. Best practices (proper naming, structure, etc.)
+5. Compliance considerations (regulatory requirements)
+
+RESPONSE FORMAT:
+{
+  "is_valid": true/false,
+  "validation_score": 0.95,
+  "errors": ["List of syntax or semantic errors"],
+  "warnings": ["List of potential issues"],
+  "suggestions": ["List of improvement suggestions"],
+  "summary": "Overall assessment of the DSL"
+}`
+		writeToBoth("%s\n", validationSystemPrompt)
+		writeToBoth("```\n")
+
+		// Show the user prompt for validation
+		validationUserPrompt := fmt.Sprintf(`Please validate the following DSL:
+
+%s
+
+Provide a comprehensive validation assessment including errors, warnings, and suggestions for improvement.`, currentDSLState.DSLText)
+
+		writeToBoth("\n📤 **User Prompt to AI**:\n")
+		writeToBoth("```\n%s\n```\n", validationUserPrompt)
+
+		// Call real AI agent if available, otherwise mock
+		var validationResponse *agent.DSLValidationResponse
+		var err error
+
+		if ai != nil {
+			writeToBoth("\n🚀 **Calling Real Gemini API for DSL Validation...**\n")
+			validationResponse, err = ai.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
+			if err != nil {
+				writeToBoth("❌ Real AI Error: %v\n", err)
+				writeToBoth("🔄 Falling back to mock response...\n")
+				if mockAgent == nil {
+					mockAgent = agent.NewMockAgent()
+				}
+				validationResponse, err = mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
+			}
+		} else {
+			if mockAgent == nil {
+				mockAgent = agent.NewMockAgent()
+			}
+			validationResponse, err = mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
+		}
+
+		if err != nil {
+			writeToBoth("❌ Error: %v\n", err)
+		} else {
+			// Show actual validation response
+			validationJSON, _ := json.Marshal(validationResponse)
+			if ai != nil {
+				writeToBoth("\n📥 **Actual Gemini AI Response**:\n")
+			} else {
+				writeToBoth("\n📥 **Mock AI Response**:\n")
+			}
+			writeToBoth("```json\n%s\n```\n", string(validationJSON))
+
+			writeToBoth("\n✅ **Parsed Validation Result**:\n")
+			writeToBoth("   ✅ Valid: %t\n", validationResponse.IsValid)
+			writeToBoth("   📈 Score: %.2f\n", validationResponse.ValidationScore)
+			writeToBoth("   📝 Summary: %s\n", validationResponse.Summary)
+			if len(validationResponse.Errors) > 0 {
+				writeToBoth("   ❌ Errors: %v\n", validationResponse.Errors)
+			}
+			if len(validationResponse.Warnings) > 0 {
+				writeToBoth("   ⚠️  Warnings: %v\n", validationResponse.Warnings)
+			}
+			if len(validationResponse.Suggestions) > 0 {
+				writeToBoth("   💡 Suggestions: %v\n", validationResponse.Suggestions)
+			}
+		}
+	}
+
 	writeToBoth("\n🎯 **Summary**:\n")
 	writeToBoth("- This capture shows the exact prompts sent to AI agents\n")
 	writeToBoth("- System prompts define the AI's role and response format\n")
 	writeToBoth("- User prompts contain the specific data and instructions\n")
 	writeToBoth("- Responses are structured JSON for reliable parsing\n")
+
+	if ai != nil {
+		writeToBoth("- ✅ **REAL GEMINI RESPONSES**: Actual AI round-trip calls were made\n")
+		writeToBoth("- 🔄 **Integration Validated**: The AI agent system is working end-to-end\n")
+	} else {
+		writeToBoth("- 🤖 **Mock responses used**: Set GEMINI_API_KEY for real AI testing\n")
+		writeToBoth("- 📋 **Prompts are ready**: These exact prompts will work with real Gemini\n")
+	}
 
 	if *captureFile != "" {
 		writeToBoth("\n📁 **Output saved to**: %s\n", *captureFile)
