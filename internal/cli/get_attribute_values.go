@@ -66,8 +66,8 @@ func RunGetAttributeValues(ctx context.Context, ds datastore.DataStore, args []s
 			return fmt.Errorf("failed to resolve value for %s: %w", attrID, err)
 		}
 
-		if err := ds.UpsertAttributeValue(ctx, *cbuID, version, attrID, val, state, prov); err != nil {
-			return fmt.Errorf("failed to store value for %s: %w", attrID, err)
+		if upsertErr := ds.UpsertAttributeValue(ctx, *cbuID, version, attrID, val, state, prov); upsertErr != nil {
+			return fmt.Errorf("failed to store value for %s: %w", attrID, upsertErr)
 		}
 
 		if state == "resolved" {

@@ -66,28 +66,9 @@ func RunDiscoverResources(ctx context.Context, ds datastore.DataStore, args []st
 			if resource.DictionaryGroup != "" {
 				// Only fetch if we haven't already
 				if _, ok := dictionaryAttributeMap[resource.DictionaryGroup]; !ok {
-						// TODO: GetAttributesForDictionaryGroup not implemented in DataStore interface
-					// Will implement in next session for proper DSL CRUD
-					var storeAttributes []store.Attribute // empty for now
-					attrErr := error(nil)
+					dictAttributes, attrErr := ds.GetAttributesForDictionaryGroup(ctx, resource.DictionaryGroup)
 					if attrErr != nil {
 						return attrErr
-					}
-					// Convert store.Attribute to dictionary.Attribute
-					dictAttributes := make([]dictionary.Attribute, len(storeAttributes))
-					for i, attr := range storeAttributes {
-						dictAttributes[i] = dictionary.Attribute{
-							AttributeID:     attr.AttributeID,
-							Name:            attr.Name,
-							LongDescription: attr.LongDescription,
-							GroupID:         attr.GroupID,
-							Mask:            attr.Mask,
-							Domain:          attr.Domain,
-							Vector:          attr.Vector,
-							// Note: Source and Sink are JSON strings in store.Attribute
-							// but SourceMetadata/SinkMetadata structs in dictionary.Attribute
-							// For now, we'll leave them as empty structs since this is POC
-						}
 					}
 					dictionaryAttributeMap[resource.DictionaryGroup] = dictAttributes
 				}

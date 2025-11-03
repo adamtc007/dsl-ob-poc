@@ -117,3 +117,15 @@ make check              # Run fmt, vet, and lint (pre-commit check)
 ## CI/CD
 
 GitHub Actions pipeline runs on Ubuntu with Go version from `go.mod`, caches modules and build artifacts, executes lint/build/test phases with 5-minute timeout.
+
+## Pending Tasks (Deferred to Next Session)
+
+**DSL CRUD Operations Enhancement**: The onboarding DSL is the key artifact of this POC. Current implementation has temporary workarounds that need to be completed:
+
+1. **Update DSL functions to use DataStore interface**: Functions like `PopulateAttributeValues` currently expect concrete store types
+2. **Complete attribute resolution workflow**: The `populate-attributes` and `get-attribute-values` commands need full DataStore integration
+3. **Implement missing DataStore methods**: Some operations like `GetAttributesForDictionaryGroup` are commented out
+4. **Enhance mock data error handling**: Improve graceful handling for missing mock data files
+5. **Complete integration test refactoring**: Update skipped tests to work with DataStore interface injection
+
+These tasks are critical for the full onboarding workflow but were deferred to focus on completing the DataStore interface abstraction successfully.

@@ -2,7 +2,9 @@ package mocks
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -19,35 +21,48 @@ func NewJSONDataLoader(basePath string) *JSONDataLoader {
 	return &JSONDataLoader{basePath: basePath}
 }
 
-// LoadCBUs loads CBU mock data from JSON
-func (j *JSONDataLoader) LoadCBUs() ([]store.CBU, error) {
-	filePath := filepath.Join(j.basePath, "cbus.json")
+// loadJSONFile loads a JSON file and unmarshals it into the target
+func (j *JSONDataLoader) loadJSONFile(filename string, target interface{}, required bool) error {
+	filePath := filepath.Join(j.basePath, filename)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read CBUs file: %w", err)
+		if errors.Is(err, os.ErrNotExist) && !required {
+			log.Printf("Optional mock data file not found: %s (continuing with empty data)", filePath)
+			return nil // Return nil for optional missing files
+		}
+		return fmt.Errorf("failed to read %s: %w (file path: %s)", filename, err, filePath)
 	}
 
+	if len(data) == 0 {
+		if !required {
+			log.Printf("Mock data file is empty: %s (continuing with empty data)", filePath)
+			return nil
+		}
+		return fmt.Errorf("mock data file is empty: %s", filePath)
+	}
+
+	if err := json.Unmarshal(data, target); err != nil {
+		return fmt.Errorf("failed to unmarshal %s: %w (file path: %s)", filename, err, filePath)
+	}
+
+	return nil
+}
+
+// LoadCBUs loads CBU mock data from JSON
+func (j *JSONDataLoader) LoadCBUs() ([]store.CBU, error) {
 	var cbus []store.CBU
-	if err := json.Unmarshal(data, &cbus); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal CBUs: %w", err)
+	if err := j.loadJSONFile("cbus.json", &cbus, true); err != nil {
+		return nil, err
 	}
-
 	return cbus, nil
 }
 
 // LoadRoles loads role mock data from JSON
 func (j *JSONDataLoader) LoadRoles() ([]store.Role, error) {
-	filePath := filepath.Join(j.basePath, "roles.json")
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read roles file: %w", err)
-	}
-
 	var roles []store.Role
-	if err := json.Unmarshal(data, &roles); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal roles: %w", err)
+	if err := j.loadJSONFile("roles.json", &roles, true); err != nil {
+		return nil, err
 	}
-
 	return roles, nil
 }
 
@@ -117,17 +132,10 @@ func (j *JSONDataLoader) LoadPartnerships() ([]store.Partnership, error) {
 
 // LoadIndividuals loads individual mock data from JSON
 func (j *JSONDataLoader) LoadIndividuals() ([]store.Individual, error) {
-	filePath := filepath.Join(j.basePath, "entity_individuals.json")
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read individuals file: %w", err)
-	}
-
 	var individuals []store.Individual
-	if err := json.Unmarshal(data, &individuals); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal individuals: %w", err)
+	if err := j.loadJSONFile("entity_individuals.json", &individuals, false); err != nil {
+		return nil, err
 	}
-
 	return individuals, nil
 }
 
@@ -149,33 +157,19 @@ func (j *JSONDataLoader) LoadCBUEntityRoles() ([]store.CBUEntityRole, error) {
 
 // LoadProducts loads product mock data from JSON
 func (j *JSONDataLoader) LoadProducts() ([]store.Product, error) {
-	filePath := filepath.Join(j.basePath, "products.json")
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read products file: %w", err)
-	}
-
 	var products []store.Product
-	if err := json.Unmarshal(data, &products); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal products: %w", err)
+	if err := j.loadJSONFile("products.json", &products, true); err != nil {
+		return nil, err
 	}
-
 	return products, nil
 }
 
 // LoadServices loads service mock data from JSON
 func (j *JSONDataLoader) LoadServices() ([]store.Service, error) {
-	filePath := filepath.Join(j.basePath, "services.json")
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read services file: %w", err)
-	}
-
 	var services []store.Service
-	if err := json.Unmarshal(data, &services); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal services: %w", err)
+	if err := j.loadJSONFile("services.json", &services, true); err != nil {
+		return nil, err
 	}
-
 	return services, nil
 }
 
@@ -270,17 +264,10 @@ type AttributeValue struct {
 
 // LoadAttributeValues loads attribute values from JSON
 func (j *JSONDataLoader) LoadAttributeValues() ([]AttributeValue, error) {
-	filePath := filepath.Join(j.basePath, "attribute_values.json")
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read attribute values file: %w", err)
-	}
-
 	var values []AttributeValue
-	if err := json.Unmarshal(data, &values); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal attribute values: %w", err)
+	if err := j.loadJSONFile("attribute_values.json", &values, false); err != nil {
+		return nil, err
 	}
-
 	return values, nil
 }
 

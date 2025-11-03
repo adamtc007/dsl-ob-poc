@@ -504,11 +504,11 @@ func (s *Store) GetDictionaryAttributeByName(ctx context.Context, name string) (
 	}
 
 	// Parse JSON metadata
-	if err := json.Unmarshal([]byte(sourceJSON), &attr.Source); err != nil {
-		return nil, fmt.Errorf("failed to parse source metadata: %w", err)
+	if parseErr := json.Unmarshal([]byte(sourceJSON), &attr.Source); parseErr != nil {
+		return nil, fmt.Errorf("failed to parse source metadata: %w", parseErr)
 	}
-	if err := json.Unmarshal([]byte(sinkJSON), &attr.Sink); err != nil {
-		return nil, fmt.Errorf("failed to parse sink metadata: %w", err)
+	if parseErr := json.Unmarshal([]byte(sinkJSON), &attr.Sink); parseErr != nil {
+		return nil, fmt.Errorf("failed to parse sink metadata: %w", parseErr)
 	}
 
 	return &attr, nil
@@ -534,11 +534,11 @@ func (s *Store) GetDictionaryAttributeByID(ctx context.Context, id string) (*dic
 	}
 
 	// Parse JSON metadata
-	if err := json.Unmarshal([]byte(sourceJSON), &attr.Source); err != nil {
-		return nil, fmt.Errorf("failed to parse source metadata: %w", err)
+	if parseErr := json.Unmarshal([]byte(sourceJSON), &attr.Source); parseErr != nil {
+		return nil, fmt.Errorf("failed to parse source metadata: %w", parseErr)
 	}
-	if err := json.Unmarshal([]byte(sinkJSON), &attr.Sink); err != nil {
-		return nil, fmt.Errorf("failed to parse sink metadata: %w", err)
+	if parseErr := json.Unmarshal([]byte(sinkJSON), &attr.Sink); parseErr != nil {
+		return nil, fmt.Errorf("failed to parse sink metadata: %w", parseErr)
 	}
 
 	return &attr, nil
@@ -569,17 +569,17 @@ func (s *Store) ResolveValueFor(ctx context.Context, cbuID, attributeID string) 
 	// Super simple: if source indicates "cbus" table, fetch by cbuID
 	sourceMap := make(map[string]interface{})
 	sourceJSON, _ := json.Marshal(a.Source)
-	if err := json.Unmarshal(sourceJSON, &sourceMap); err != nil {
-		return nil, nil, "", fmt.Errorf("failed to parse source metadata: %w", err)
+	if parseErr := json.Unmarshal(sourceJSON, &sourceMap); parseErr != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse source metadata: %w", parseErr)
 	}
 
 	if table, ok := sourceMap["table"].(string); ok && table == "cbus" {
-		if field, ok := sourceMap["field"].(string); ok && field != "" {
+		if field, fieldOk := sourceMap["field"].(string); fieldOk && field != "" {
 			query := fmt.Sprintf(`SELECT %s FROM "dsl-ob-poc".cbus WHERE cbu_id=$1`, field)
 			var val interface{}
-			err := s.db.QueryRowContext(ctx, query, cbuID).Scan(&val)
-			if err != nil {
-				return nil, nil, "", err
+			scanErr := s.db.QueryRowContext(ctx, query, cbuID).Scan(&val)
+			if scanErr != nil {
+				return nil, nil, "", scanErr
 			}
 			payload, _ := json.Marshal(val)
 			prov := map[string]any{"table": "cbus", "field": field}
@@ -699,7 +699,7 @@ func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([
 }
 
 // GetAttributesForDictionaryGroup retrieves all attributes for a given dictionary group.
-func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]Attribute, error) {
+func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]dictionary.Attribute, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT attribute_id, name, COALESCE(long_description, ''), group_id,
                 COALESCE(mask, 'string'), COALESCE(domain, ''), COALESCE(vector, ''),
@@ -712,14 +712,25 @@ func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID str
 	}
 	defer rows.Close()
 
-	var attributes []Attribute
+	var attributes []dictionary.Attribute
 	for rows.Next() {
-		var attr Attribute
+		var attr dictionary.Attribute
+		var sourceJSON, sinkJSON string
+
 		if scanErr := rows.Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription,
 			&attr.GroupID, &attr.Mask, &attr.Domain, &attr.Vector,
-			&attr.Source, &attr.Sink); scanErr != nil {
+			&sourceJSON, &sinkJSON); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan attribute: %w", scanErr)
 		}
+
+		// Parse JSON metadata
+		if err := json.Unmarshal([]byte(sourceJSON), &attr.Source); err != nil {
+			return nil, fmt.Errorf("failed to parse source metadata: %w", err)
+		}
+		if err := json.Unmarshal([]byte(sinkJSON), &attr.Sink); err != nil {
+			return nil, fmt.Errorf("failed to parse sink metadata: %w", err)
+		}
+
 		attributes = append(attributes, attr)
 	}
 

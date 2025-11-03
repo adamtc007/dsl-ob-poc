@@ -43,6 +43,7 @@ type DataStore interface {
 	// Dictionary Operations
 	GetDictionaryAttributeByName(ctx context.Context, name string) (*dictionary.Attribute, error)
 	GetDictionaryAttributeByID(ctx context.Context, id string) (*dictionary.Attribute, error)
+	GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]dictionary.Attribute, error)
 
 	// DSL Operations
 	GetLatestDSL(ctx context.Context, cbuID string) (string, error)
@@ -188,6 +189,10 @@ func (p *postgresAdapter) GetDictionaryAttributeByID(ctx context.Context, id str
 	return p.store.GetDictionaryAttributeByID(ctx, id)
 }
 
+func (p *postgresAdapter) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]dictionary.Attribute, error) {
+	return p.store.GetAttributesForDictionaryGroup(ctx, groupID)
+}
+
 func (p *postgresAdapter) GetLatestDSL(ctx context.Context, cbuID string) (string, error) {
 	return p.store.GetLatestDSL(ctx, cbuID)
 }
@@ -291,6 +296,10 @@ func (m *mockAdapter) GetDictionaryAttributeByName(ctx context.Context, name str
 
 func (m *mockAdapter) GetDictionaryAttributeByID(ctx context.Context, id string) (*dictionary.Attribute, error) {
 	return m.store.GetDictionaryAttributeByID(ctx, id)
+}
+
+func (m *mockAdapter) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]dictionary.Attribute, error) {
+	return m.store.GetAttributesForDictionaryGroup(ctx, groupID)
 }
 
 func (m *mockAdapter) GetLatestDSL(ctx context.Context, cbuID string) (string, error) {

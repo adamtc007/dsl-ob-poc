@@ -15,22 +15,22 @@ type MockStore struct {
 	loader *JSONDataLoader
 
 	// Cached data
-	cbus               []store.CBU
-	roles              []store.Role
-	entityTypes        []store.EntityType
-	entities           []store.Entity
-	limitedCompanies   []store.LimitedCompany
-	partnerships       []store.Partnership
-	individuals        []store.Individual
-	cbuEntityRoles     []store.CBUEntityRole
-	products           []store.Product
-	services           []store.Service
-	prodResources      []store.ProdResource
-	productServices    []ProductServiceRelation
-	serviceResources   []ServiceResourceRelation
-	dictionary         []store.Attribute
-	attributeValues    []AttributeValue
-	dslRecords         []DSLRecord
+	cbus             []store.CBU
+	roles            []store.Role
+	entityTypes      []store.EntityType
+	entities         []store.Entity
+	limitedCompanies []store.LimitedCompany
+	partnerships     []store.Partnership
+	individuals      []store.Individual
+	cbuEntityRoles   []store.CBUEntityRole
+	products         []store.Product
+	services         []store.Service
+	prodResources    []store.ProdResource
+	productServices  []ProductServiceRelation
+	serviceResources []ServiceResourceRelation
+	dictionary       []store.Attribute
+	attributeValues  []AttributeValue
+	dslRecords       []DSLRecord
 
 	loaded bool
 }
@@ -347,6 +347,28 @@ func (m *MockStore) GetDictionaryAttributeByID(ctx context.Context, id string) (
 		}
 	}
 	return nil, fmt.Errorf("attribute not found: %s", id)
+}
+
+func (m *MockStore) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]dictionary.Attribute, error) {
+	if err := m.loadData(); err != nil {
+		return nil, err
+	}
+
+	var attributes []dictionary.Attribute
+	for _, attr := range m.dictionary {
+		if attr.GroupID == groupID {
+			attributes = append(attributes, dictionary.Attribute{
+				AttributeID:     attr.AttributeID,
+				Name:            attr.Name,
+				LongDescription: attr.LongDescription,
+				GroupID:         attr.GroupID,
+				Mask:            attr.Mask,
+				Domain:          attr.Domain,
+			})
+		}
+	}
+
+	return attributes, nil
 }
 
 // DSL Operations

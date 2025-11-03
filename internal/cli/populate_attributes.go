@@ -40,14 +40,12 @@ func RunPopulateAttributes(ctx context.Context, ds datastore.DataStore, args []s
 
 	log.Printf("Found %d attribute references to populate", len(attributeRefs))
 
-	// TODO: PopulateAttributeValues needs to be updated to use DataStore interface
-	// This will be implemented in next session for proper DSL CRUD operations
-	// populatedValues, err := dsl.PopulateAttributeValues(ctx, ds, *cbuID, attributeRefs)
-	// if err != nil {
-	//	return fmt.Errorf("failed to populate attribute values: %w", err)
-	// }
-	var populatedValues []dsl.AttributeValue // empty for now
-	log.Printf("Attribute population deferred - found %d refs to populate", len(attributeRefs))
+	// Populate attribute values using the DataStore interface
+	populatedValues, err := dsl.PopulateAttributeValues(ctx, ds, *cbuID, attributeRefs)
+	if err != nil {
+		return fmt.Errorf("failed to populate attribute values: %w", err)
+	}
+	log.Printf("Successfully populated %d attribute values", len(populatedValues))
 
 	// Generate final DSL with populated values
 	finalDSL, err := dsl.AddPopulatedAttributes(currentDSL, populatedValues)

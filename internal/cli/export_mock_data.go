@@ -22,7 +22,7 @@ func RunExportMockData(ctx context.Context, ds datastore.DataStore, args []strin
 	}
 
 	// Ensure output directory exists
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -126,7 +126,7 @@ func writeJSONFile(filePath string, data interface{}, dataType string) error {
 		return fmt.Errorf("failed to marshal %s: %w", dataType, err)
 	}
 
-	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(filePath, jsonData, 0o644); err != nil {
 		return fmt.Errorf("failed to write %s file: %w", dataType, err)
 	}
 

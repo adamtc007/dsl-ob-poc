@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dictionary"
 	"dsl-ob-poc/internal/store"
 )
@@ -433,24 +434,25 @@ func ParseAttributeReferences(dsl string) ([]AttributeReference, error) {
 }
 
 // PopulateAttributeValues fetches runtime values for attribute variables
-func PopulateAttributeValues(ctx context.Context, s *store.Store, onboardingID string, refs []AttributeReference) ([]AttributeValue, error) {
+func PopulateAttributeValues(ctx context.Context, ds datastore.DataStore, onboardingID string, refs []AttributeReference) ([]AttributeValue, error) {
 	var values []AttributeValue
 
 	for _, ref := range refs {
 		// Get attribute definition from dictionary by UUID
-		attr, err := s.GetDictionaryAttributeByID(ctx, ref.AttributeID)
+		attr, err := ds.GetDictionaryAttributeByID(ctx, ref.AttributeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get attribute %s: %w", ref.AttributeID, err)
 		}
 
 		// Fetch runtime value based on source metadata
-		value, sourceInfo, err := fetchAttributeValue(ctx, s, onboardingID, attr)
+		value, sourceInfo, err := fetchAttributeValue(ctx, ds, onboardingID, attr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch value for %s: %w", ref.Name, err)
 		}
 
-		// Store the value in attribute_values table
-		err = s.StoreAttributeValue(ctx, onboardingID, attr.AttributeID, value, sourceInfo)
+		// Store the value in attribute_values table using the new interface
+		valueJSON, _ := json.Marshal(value)
+		err = ds.UpsertAttributeValue(ctx, onboardingID, 0, attr.AttributeID, valueJSON, "populated", sourceInfo)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store value for %s: %w", ref.Name, err)
 		}
@@ -467,7 +469,7 @@ func PopulateAttributeValues(ctx context.Context, s *store.Store, onboardingID s
 }
 
 // fetchAttributeValue retrieves the actual value based on source metadata
-func fetchAttributeValue(ctx context.Context, s *store.Store, onboardingID string, attr *dictionary.Attribute) (string, map[string]interface{}, error) {
+func fetchAttributeValue(ctx context.Context, ds datastore.DataStore, onboardingID string, attr *dictionary.Attribute) (string, map[string]interface{}, error) {
 	// For POC, implement simple value fetching based on attribute name
 	switch attr.Name {
 	case "onboard.cbu_id":
@@ -476,7 +478,7 @@ func fetchAttributeValue(ctx context.Context, s *store.Store, onboardingID strin
 
 	case "entity.legal_name":
 		// Look up CBU name from cbus table
-		cbu, err := s.GetCBUByName(ctx, onboardingID)
+		cbu, err := ds.GetCBUByName(ctx, onboardingID)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get CBU: %w", err)
 		}
@@ -484,7 +486,7 @@ func fetchAttributeValue(ctx context.Context, s *store.Store, onboardingID strin
 
 	case "entity.domicile":
 		// Extract domicile from nature_purpose for POC
-		cbu, err := s.GetCBUByName(ctx, onboardingID)
+		cbu, err := ds.GetCBUByName(ctx, onboardingID)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get CBU: %w", err)
 		}
