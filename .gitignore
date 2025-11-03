@@ -20,6 +20,8 @@ mem.out
 /dist/
 /target/
 /coverage/
+coverage.out
+coverage.html
 
 ############################
 # Local caches
@@ -35,3 +37,8 @@ mem.out
 *.log
 .DS_Store
 *.zip
+
+############################
+# Legacy/duplicate source dumps
+############################
+/dsl-ob-poc-src/
