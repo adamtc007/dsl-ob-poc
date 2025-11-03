@@ -250,8 +250,8 @@ func TestAddDiscoveredResources(t *testing.T) {
 		t.Errorf("Expected DSL to contain owner, got: %s", result)
 	}
 
-	if !strings.Contains(result, "(attr.\"custody.account_number\")") {
-		t.Errorf("Expected DSL to contain attribute, got: %s", result)
+	if !strings.Contains(result, "(var (attr-id \"a1\"))") {
+		t.Errorf("Expected DSL to contain attribute variable, got: %s", result)
 	}
 }
 
@@ -287,11 +287,131 @@ func TestAddDiscoveredResourcesMultiple(t *testing.T) {
 		t.Errorf("Expected DSL to contain 'AccountingRecord', got: %s", result)
 	}
 
-	if !strings.Contains(result, "account_number") {
-		t.Errorf("Expected DSL to contain 'account_number', got: %s", result)
+	if !strings.Contains(result, "(var (attr-id \"a1\"))") {
+		t.Errorf("Expected DSL to contain custody account attribute variable, got: %s", result)
 	}
 
-	if !strings.Contains(result, "nav_value") {
-		t.Errorf("Expected DSL to contain 'nav_value', got: %s", result)
+	if !strings.Contains(result, "(var (attr-id \"a2\"))") {
+		t.Errorf("Expected DSL to contain accounting attribute variable, got: %s", result)
+	}
+}
+
+// --- Tests for State 6: Populate Attributes ---
+
+func TestVarByAttrID(t *testing.T) {
+	id := "123e4567-e89b-12d3-a456-426614174000"
+	result := VarByAttrID(id)
+	expected := `(var (attr-id "123e4567-e89b-12d3-a456-426614174000"))`
+
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+}
+
+func TestExtractVarAttrIDs(t *testing.T) {
+	dsl := `(case.create
+  (var (attr-id "123e4567-e89b-12d3-a456-426614174000"))
+  (var (attr-id "987fcdeb-51a2-43f7-8765-ba9876543210"))
+)`
+
+	ids := ExtractVarAttrIDs(dsl)
+
+	if len(ids) != 2 {
+		t.Fatalf("Expected 2 attribute IDs, got %d", len(ids))
+	}
+
+	expected1 := "123e4567-e89b-12d3-a456-426614174000"
+	expected2 := "987fcdeb-51a2-43f7-8765-ba9876543210"
+
+	if ids[0] != expected1 {
+		t.Errorf("Expected first ID to be %q, got %q", expected1, ids[0])
+	}
+
+	if ids[1] != expected2 {
+		t.Errorf("Expected second ID to be %q, got %q", expected2, ids[1])
+	}
+}
+
+func TestNormalizeVars(t *testing.T) {
+	dsl := `(case.create
+  (VAR_onboard.cbu_id)
+  (VAR_entity.legal_name)
+  (VAR_unknown)
+)`
+
+	// Mock resolver that maps attribute names to UUIDs
+	resolver := func(sym string) (string, bool) {
+		switch sym {
+		case "onboard.cbu_id":
+			return "123e4567-e89b-12d3-a456-426614174000", true
+		case "entity.legal_name":
+			return "987fcdeb-51a2-43f7-8765-ba9876543210", true
+		default:
+			return "", false
+		}
+	}
+
+	result := NormalizeVars(dsl, resolver)
+
+	// Should convert known symbols to canonical form, leave unknown unchanged
+	if !strings.Contains(result, `(var (attr-id "123e4567-e89b-12d3-a456-426614174000"))`) {
+		t.Errorf("Expected DSL to contain normalized CBU variable, got: %s", result)
+	}
+
+	if !strings.Contains(result, `(var (attr-id "987fcdeb-51a2-43f7-8765-ba9876543210"))`) {
+		t.Errorf("Expected DSL to contain normalized legal name variable, got: %s", result)
+	}
+
+	if !strings.Contains(result, "(VAR_unknown)") {
+		t.Errorf("Expected DSL to preserve unknown variable, got: %s", result)
+	}
+}
+
+func TestParseAttributeReferences(t *testing.T) {
+	dsl := `(resources.plan
+  (resource.create "CustodyAccount"
+    (var (attr-id "123e4567-e89b-12d3-a456-426614174000"))
+    (var (attr-id "987fcdeb-51a2-43f7-8765-ba9876543210"))
+  )
+)`
+
+	refs, err := ParseAttributeReferences(dsl)
+	if err != nil {
+		t.Fatalf("ParseAttributeReferences failed: %v", err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("Expected 2 attribute references, got %d", len(refs))
+	}
+
+	// Check first reference
+	if refs[0].AttributeID != "123e4567-e89b-12d3-a456-426614174000" {
+		t.Errorf("Expected first AttributeID to be '123e4567-e89b-12d3-a456-426614174000', got '%s'", refs[0].AttributeID)
+	}
+
+	// Check second reference
+	if refs[1].AttributeID != "987fcdeb-51a2-43f7-8765-ba9876543210" {
+		t.Errorf("Expected second AttributeID to be '987fcdeb-51a2-43f7-8765-ba9876543210', got '%s'", refs[1].AttributeID)
+	}
+}
+
+func TestRenderBindings(t *testing.T) {
+	assignments := map[string]string{
+		"123e4567-e89b-12d3-a456-426614174000": `"CBU-1234"`,
+		"987fcdeb-51a2-43f7-8765-ba9876543210": `"Aviva Investors Global Fund"`,
+	}
+
+	result := RenderBindings(assignments)
+
+	if !strings.Contains(result, "(values.bind") {
+		t.Errorf("Expected result to contain '(values.bind', got: %s", result)
+	}
+
+	if !strings.Contains(result, `(bind (attr-id "123e4567-e89b-12d3-a456-426614174000") (value "CBU-1234"))`) {
+		t.Errorf("Expected result to contain CBU binding, got: %s", result)
+	}
+
+	if !strings.Contains(result, `(bind (attr-id "987fcdeb-51a2-43f7-8765-ba9876543210") (value "Aviva Investors Global Fund"))`) {
+		t.Errorf("Expected result to contain legal name binding, got: %s", result)
 	}
 }

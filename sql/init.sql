@@ -19,6 +19,17 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
 CREATE INDEX IF NOT EXISTS idx_dsl_ob_cbu_id_created_at
 ON "dsl-ob-poc".dsl_ob (cbu_id, created_at DESC);
 
+-- CBU table: Client Business Unit definitions
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".cbus (
+    cbu_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    nature_purpose TEXT,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+CREATE INDEX IF NOT EXISTS idx_cbus_name ON "dsl-ob-poc".cbus (name);
+
 -- Products table: Core product definitions
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
     product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,6 +92,21 @@ CREATE INDEX IF NOT EXISTS idx_dictionary_name ON "dsl-ob-poc".dictionary (name)
 CREATE INDEX IF NOT EXISTS idx_dictionary_group_id ON "dsl-ob-poc".dictionary (group_id);
 CREATE INDEX IF NOT EXISTS idx_dictionary_domain ON "dsl-ob-poc".dictionary (domain);
 
+-- Attribute Values table: Runtime values for onboarding instances
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".attribute_values (
+    av_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cbu_id        UUID NOT NULL REFERENCES "dsl-ob-poc".cbus(cbu_id),
+    dsl_ob_id     UUID,                  -- optional: reference precise DSL row, if you store dsl_ob.id
+    dsl_version   INTEGER NOT NULL,      -- tie values to the exact runbook snapshot
+    attribute_id  UUID NOT NULL REFERENCES "dsl-ob-poc".dictionary (attribute_id) ON DELETE CASCADE,
+    value         JSONB NOT NULL,
+    state         TEXT NOT NULL DEFAULT 'resolved', -- 'pending' | 'resolved' | 'invalid'
+    source        JSONB,                 -- provenance (table/column/system/collector)
+    observed_at   TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    UNIQUE (cbu_id, dsl_version, attribute_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_attr_vals_lookup ON "dsl-ob-poc".attribute_values (cbu_id, attribute_id, dsl_version);
 
 -- Production Resources table
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (

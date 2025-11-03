@@ -3,17 +3,27 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"dsl-ob-poc/internal/dictionary"
 	_ "github.com/lib/pq"
 )
 
 // Store represents the database connection and operations.
 type Store struct {
 	db *sql.DB
+}
+
+// CBU represents a Client Business Unit in the catalog.
+type CBU struct {
+	CBUID         string
+	Name          string
+	Description   string
+	NaturePurpose string
 }
 
 // Product represents a product in the catalog.
@@ -109,6 +119,32 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 		_ = tx.Rollback()
 	}()
 
+	// Insert CBUs
+	cbus := []struct {
+		name          string
+		description   string
+		naturePurpose string
+	}{
+		{"CBU-1234", "Aviva Investors Global Fund", "UCITS equity fund domiciled in LU"},
+		{"CBU-5678", "Blackrock US Debt Fund", "Corporate debt fund domiciled in IE"},
+		{"CBU-9999", "Test Development Fund", "Mock fund for testing and development"},
+	}
+
+	cbuIDs := make(map[string]string)
+	for _, c := range cbus {
+		var cbuID string
+		queryErr := tx.QueryRowContext(ctx,
+			`INSERT INTO "dsl-ob-poc".cbus (name, description, nature_purpose)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description, nature_purpose = EXCLUDED.nature_purpose
+			 RETURNING cbu_id`,
+			c.name, c.description, c.naturePurpose).Scan(&cbuID)
+		if queryErr != nil {
+			return fmt.Errorf("failed to insert CBU %s: %w", c.name, queryErr)
+		}
+		cbuIDs[c.name] = cbuID
+	}
+
 	// Insert Products
 	products := []struct {
 		name        string
@@ -192,6 +228,15 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 		sourceJSON      string
 		sinkJSON        string
 	}{
+		{
+			"onboard.cbu_id",
+			"Client Business Unit identifier for onboarding case tracking and workflow management",
+			"Onboarding",
+			"string",
+			"Onboarding",
+			`{"type": "manual", "url": "https://onboarding.example.com/cbu", "required": true, "format": "CBU-[0-9]+"}`,
+			`{"type": "database", "url": "postgres://onboarding_db/cases", "table": "onboarding_cases", "field": "cbu_id"}`,
+		},
 		{
 			"entity.legal_name",
 			"Legal name of the entity for KYC purposes",
@@ -370,6 +415,132 @@ func (s *Store) GetDSLHistory(ctx context.Context, cbuID string) ([]DSLVersion, 
 	}
 
 	return history, nil
+}
+
+// GetDictionaryAttributeByName retrieves an attribute from the dictionary by name
+func (s *Store) GetDictionaryAttributeByName(ctx context.Context, name string) (*dictionary.Attribute, error) {
+	var attr dictionary.Attribute
+	var sourceJSON, sinkJSON string
+
+	err := s.db.QueryRowContext(ctx,
+		`SELECT attribute_id, name, long_description, group_id, mask, domain,
+		        COALESCE(vector, ''), COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
+		 FROM "dsl-ob-poc".dictionary WHERE name = $1`,
+		name).Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription, &attr.GroupID,
+		&attr.Mask, &attr.Domain, &attr.Vector, &sourceJSON, &sinkJSON)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("attribute '%s' not found in dictionary", name)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attribute: %w", err)
+	}
+
+	// Parse JSON metadata
+	if err := json.Unmarshal([]byte(sourceJSON), &attr.Source); err != nil {
+		return nil, fmt.Errorf("failed to parse source metadata: %w", err)
+	}
+	if err := json.Unmarshal([]byte(sinkJSON), &attr.Sink); err != nil {
+		return nil, fmt.Errorf("failed to parse sink metadata: %w", err)
+	}
+
+	return &attr, nil
+}
+
+// GetDictionaryAttributeByID retrieves an attribute from the dictionary by UUID
+func (s *Store) GetDictionaryAttributeByID(ctx context.Context, id string) (*dictionary.Attribute, error) {
+	var attr dictionary.Attribute
+	var sourceJSON, sinkJSON string
+
+	err := s.db.QueryRowContext(ctx,
+		`SELECT attribute_id, name, long_description, group_id, mask, domain,
+		        COALESCE(vector, ''), COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
+		 FROM "dsl-ob-poc".dictionary WHERE attribute_id = $1`,
+		id).Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription, &attr.GroupID,
+		&attr.Mask, &attr.Domain, &attr.Vector, &sourceJSON, &sinkJSON)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("attribute with ID '%s' not found in dictionary", id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attribute: %w", err)
+	}
+
+	// Parse JSON metadata
+	if err := json.Unmarshal([]byte(sourceJSON), &attr.Source); err != nil {
+		return nil, fmt.Errorf("failed to parse source metadata: %w", err)
+	}
+	if err := json.Unmarshal([]byte(sinkJSON), &attr.Sink); err != nil {
+		return nil, fmt.Errorf("failed to parse sink metadata: %w", err)
+	}
+
+	return &attr, nil
+}
+
+// GetCBUByName retrieves a CBU by name from the catalog
+func (s *Store) GetCBUByName(ctx context.Context, name string) (*CBU, error) {
+	var cbu CBU
+	err := s.db.QueryRowContext(ctx,
+		`SELECT cbu_id, name, description, nature_purpose FROM "dsl-ob-poc".cbus WHERE name = $1`,
+		name).Scan(&cbu.CBUID, &cbu.Name, &cbu.Description, &cbu.NaturePurpose)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("CBU '%s' not found in catalog", name)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CBU: %w", err)
+	}
+	return &cbu, nil
+}
+
+// ResolveValueFor resolves attribute values using source metadata
+func (s *Store) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (json.RawMessage, map[string]any, string, error) {
+	a, err := s.GetDictionaryAttributeByID(ctx, attributeID)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	// Super simple: if source indicates "cbus" table, fetch by cbuID
+	sourceMap := make(map[string]interface{})
+	sourceJSON, _ := json.Marshal(a.Source)
+	if err := json.Unmarshal(sourceJSON, &sourceMap); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse source metadata: %w", err)
+	}
+
+	if table, ok := sourceMap["table"].(string); ok && table == "cbus" {
+		if field, ok := sourceMap["field"].(string); ok && field != "" {
+			query := fmt.Sprintf(`SELECT %s FROM "dsl-ob-poc".cbus WHERE cbu_id=$1`, field)
+			var val interface{}
+			err := s.db.QueryRowContext(ctx, query, cbuID).Scan(&val)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			payload, _ := json.Marshal(val)
+			prov := map[string]any{"table": "cbus", "field": field}
+			return payload, prov, "resolved", nil
+		}
+	}
+
+	// Unknown source → pending solicit
+	return json.RawMessage(`null`), map[string]any{"reason": "no_resolver"}, "pending", nil
+}
+
+// UpsertAttributeValue stores or updates an attribute value
+func (s *Store) UpsertAttributeValue(ctx context.Context, cbuID string, dslVersion int, attributeID string, value json.RawMessage, state string, source map[string]any) error {
+	srcJSON, _ := json.Marshal(source)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO "dsl-ob-poc".attribute_values (cbu_id, dsl_version, attribute_id, value, state, source)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (cbu_id, dsl_version, attribute_id)
+		DO UPDATE SET value = EXCLUDED.value, state = EXCLUDED.state, source = EXCLUDED.source, observed_at = (now() at time zone 'utc')`,
+		cbuID, dslVersion, attributeID, value, state, string(srcJSON))
+	return err
+}
+
+// StoreAttributeValue is a simple wrapper for UpsertAttributeValue
+func (s *Store) StoreAttributeValue(ctx context.Context, onboardingID, attributeID, value string, sourceInfo map[string]interface{}) error {
+	valueJSON, _ := json.Marshal(value)
+	// For POC, use dsl_version = 1
+	return s.UpsertAttributeValue(ctx, onboardingID, 1, attributeID, valueJSON, "resolved", sourceInfo)
 }
 
 // GetProductByName retrieves a product by name from the catalog.

@@ -1,6 +1,8 @@
 package dsl
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -340,9 +342,184 @@ func AddDiscoveredResources(currentDSL string, plan ResourceDiscoveryPlan) (stri
 
 		attributes := plan.ResourceAttributes[resource.DictionaryGroup]
 		for i := range attributes {
-			b.WriteString(fmt.Sprintf("    (attr.%q)\n", attributes[i].Name))
+			// Use structured variable references: (var (attr-id "uuid"))
+			b.WriteString(fmt.Sprintf("    (var (attr-id %q))\n", attributes[i].AttributeID))
 		}
 		b.WriteString("  )\n")
+	}
+	b.WriteString(")")
+
+	return b.String(), nil
+}
+
+func RenderBindings(assign map[string]string) string {
+	var b strings.Builder
+	b.WriteString("(values.bind\n")
+	for id, raw := range assign {
+		// raw is a JSON literal; print as string if it's JSON string
+		var s string
+		if err := json.Unmarshal([]byte(raw), &s); err == nil {
+			b.WriteString(fmt.Sprintf(`  (bind (attr-id %q) (value %q))`+"\n", id, s))
+		} else {
+			b.WriteString(fmt.Sprintf(`  (bind (attr-id %q) (value %s))`+"\n", id, raw))
+		}
+	}
+	b.WriteString(")")
+	return b.String()
+}
+
+// --- State 6: Populate Attributes ---
+
+// VarByAttrID creates canonical variable form
+func VarByAttrID(id string) string {
+	return fmt.Sprintf("(var (attr-id %q))", id)
+}
+
+// Accept (VAR_<code>) or (VAR_<uuid>) and normalize to canonical form.
+// This is a lightweight regex now; Rust/nom will do the real job later.
+var reVarSym = regexp.MustCompile(`\(VAR_([A-Za-z0-9\._\-]+)\)`)
+
+func NormalizeVars(dsl string, resolve func(sym string) (attrID string, ok bool)) string {
+	return reVarSym.ReplaceAllStringFunc(dsl, func(m string) string {
+		sym := reVarSym.FindStringSubmatch(m)[1] // code or uuid
+		if id, ok := resolve(sym); ok {
+			return VarByAttrID(id)
+		}
+		// leave unknown symbols untouched (keeps idempotence)
+		return m
+	})
+}
+
+// Extract all canonical (var (attr-id "...")) occurrences
+var reVarCanon = regexp.MustCompile(`\(\s*var\s*\(\s*attr-id\s*"([^"]+)"\s*\)\s*\)`)
+
+func ExtractVarAttrIDs(dsl string) []string {
+	out := []string{}
+	for _, m := range reVarCanon.FindAllStringSubmatch(dsl, -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+// AttributeReference represents an attribute variable found in DSL
+type AttributeReference struct {
+	Name         string // e.g., "onboard.cbu_id"
+	AttributeID  string // UUID from dictionary table
+	VariableForm string // e.g., "(VAR_onboard.cbu_id)" or "(VAR_8a5d1a77_...)"
+}
+
+// AttributeValue represents a populated attribute value
+type AttributeValue struct {
+	AttributeID string
+	Name        string
+	Value       string
+	SourceInfo  map[string]interface{}
+}
+
+// ParseAttributeReferences finds all (var (attr-id "uuid")) references in DSL
+func ParseAttributeReferences(dsl string) ([]AttributeReference, error) {
+	// Use the canonical extractor
+	attrIDs := ExtractVarAttrIDs(dsl)
+
+	var refs []AttributeReference
+	for _, attrID := range attrIDs {
+		refs = append(refs, AttributeReference{
+			AttributeID:  attrID,
+			VariableForm: VarByAttrID(attrID),
+		})
+	}
+
+	return refs, nil
+}
+
+// PopulateAttributeValues fetches runtime values for attribute variables
+func PopulateAttributeValues(ctx context.Context, s *store.Store, onboardingID string, refs []AttributeReference) ([]AttributeValue, error) {
+	var values []AttributeValue
+
+	for _, ref := range refs {
+		// Get attribute definition from dictionary by UUID
+		attr, err := s.GetDictionaryAttributeByID(ctx, ref.AttributeID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get attribute %s: %w", ref.AttributeID, err)
+		}
+
+		// Fetch runtime value based on source metadata
+		value, sourceInfo, err := fetchAttributeValue(ctx, s, onboardingID, attr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch value for %s: %w", ref.Name, err)
+		}
+
+		// Store the value in attribute_values table
+		err = s.StoreAttributeValue(ctx, onboardingID, attr.AttributeID, value, sourceInfo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store value for %s: %w", ref.Name, err)
+		}
+
+		values = append(values, AttributeValue{
+			AttributeID: attr.AttributeID,
+			Name:        ref.Name,
+			Value:       value,
+			SourceInfo:  sourceInfo,
+		})
+	}
+
+	return values, nil
+}
+
+// fetchAttributeValue retrieves the actual value based on source metadata
+func fetchAttributeValue(ctx context.Context, s *store.Store, onboardingID string, attr *dictionary.Attribute) (string, map[string]interface{}, error) {
+	// For POC, implement simple value fetching based on attribute name
+	switch attr.Name {
+	case "onboard.cbu_id":
+		// Extract CBU ID from onboarding ID (assuming they're the same for POC)
+		return onboardingID, map[string]interface{}{"type": "direct", "source": "onboarding_id"}, nil
+
+	case "entity.legal_name":
+		// Look up CBU name from cbus table
+		cbu, err := s.GetCBUByName(ctx, onboardingID)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to get CBU: %w", err)
+		}
+		return cbu.Description, map[string]interface{}{"type": "database", "table": "cbus", "field": "description"}, nil
+
+	case "entity.domicile":
+		// Extract domicile from nature_purpose for POC
+		cbu, err := s.GetCBUByName(ctx, onboardingID)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to get CBU: %w", err)
+		}
+		// Simple extraction - look for "domiciled in XX"
+		domicileRegex := regexp.MustCompile(`domiciled in ([A-Z]{2})`)
+		matches := domicileRegex.FindStringSubmatch(cbu.NaturePurpose)
+		if len(matches) >= 2 {
+			return matches[1], map[string]interface{}{"type": "extracted", "source": "nature_purpose"}, nil
+		}
+		return "Unknown", map[string]interface{}{"type": "default"}, nil
+
+	default:
+		// Default placeholder for unknown attributes
+		return fmt.Sprintf("VALUE_%s", attr.Name), map[string]interface{}{"type": "placeholder"}, nil
+	}
+}
+
+// AddPopulatedAttributes generates final DSL by substituting variables with actual values
+func AddPopulatedAttributes(currentDSL string, values []AttributeValue) (string, error) {
+	result := currentDSL
+
+	// Replace each variable with its actual value
+	for _, val := range values {
+		varPattern := fmt.Sprintf("(VAR_%s)", val.Name)
+		replacement := fmt.Sprintf("(attr.%s %q)", val.Name, val.Value)
+		result = strings.ReplaceAll(result, varPattern, replacement)
+	}
+
+	// Add summary block at the end
+	var b strings.Builder
+	b.WriteString(result)
+	b.WriteString("\n\n")
+	b.WriteString("(attributes.populated\n")
+	for _, val := range values {
+		b.WriteString(fmt.Sprintf("  ; %s = %q\n", val.Name, val.Value))
 	}
 	b.WriteString(")")
 

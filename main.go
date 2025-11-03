@@ -90,6 +90,12 @@ func run() int {
 	case "discover-resources":
 		err = cli.RunDiscoverResources(ctx, dbStore, args)
 
+	case "populate-attributes":
+		err = cli.RunPopulateAttributes(ctx, dbStore, args)
+
+	case "get-attribute-values":
+		err = cli.RunGetAttributeValues(ctx, dbStore, args)
+
 	// NEW COMMAND
 	case "history":
 		err = cli.RunHistory(ctx, dbStore, args)
@@ -121,6 +127,8 @@ func printUsage() {
 	fmt.Println("  discover-kyc --cbu=<cbu-id>  (v3) Performs AI-assisted KYC discovery.")
 	fmt.Println("  discover-services --cbu=<cbu-id> (v4) Discovers and appends services plan.")
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v5) Discovers and appends resources plan.")
+	fmt.Println("  populate-attributes --cbu=<cbu-id> (v6) Populates attribute values from runtime sources.")
+	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v7) Resolves and binds attribute values deterministically.")
 	fmt.Println("\nUtility Commands:")
 	fmt.Println("  history --cbu=<cbu-id>       Views the full, versioned DSL evolution for a case.")
 }
