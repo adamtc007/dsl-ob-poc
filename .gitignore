@@ -37,6 +37,17 @@ coverage.html
 *.log
 .DS_Store
 *.zip
+*.patch
+*.diff
+
+############################
+# IDE & Editor files
+############################
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 ############################
 # Legacy/duplicate source dumps
