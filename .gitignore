@@ -32,6 +32,11 @@ coverage.html
 /.golangci-lint.cache
 
 ############################
+# Mock data (generated)
+############################
+/data/mocks/
+
+############################
 # Logs & misc
 ############################
 *.log

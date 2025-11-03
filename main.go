@@ -8,7 +8,8 @@ import (
 
 	"dsl-ob-poc/internal/agent"
 	"dsl-ob-poc/internal/cli"
-	"dsl-ob-poc/internal/store"
+	"dsl-ob-poc/internal/config"
+	"dsl-ob-poc/internal/datastore"
 )
 
 func main() {
@@ -30,25 +31,28 @@ func run() int {
 		return 0
 	}
 
-	// All other commands require DB connection
-	connString := os.Getenv("DB_CONN_STRING")
-	if connString == "" {
-		log.Println("Error: DB_CONN_STRING environment variable is not set.")
-		return 1
-	}
+	// All other commands require data store connection
+	cfg := config.GetDataStoreConfig()
 
-	dbStore, err := store.NewStore(connString)
+	dataStore, err := datastore.NewDataStore(cfg)
 	if err != nil {
-		log.Printf("Failed to initialize database store: %v", err)
+		log.Printf("Failed to initialize data store: %v", err)
 		return 1
 	}
-	defer dbStore.Close()
+	defer dataStore.Close()
+
+	// Print mode information for clarity
+	if config.IsMockMode() {
+		fmt.Printf("Running in MOCK mode (data from: %s)\n", cfg.MockDataPath)
+	} else {
+		fmt.Println("Running in DATABASE mode")
+	}
 
 	ctx := context.Background()
 
 	switch command {
 	case "init-db":
-		err = dbStore.InitDB(ctx)
+		err = dataStore.InitDB(ctx)
 		if err != nil {
 			log.Printf("Failed to initialize database: %v", err)
 			return 1
@@ -56,7 +60,7 @@ func run() int {
 		fmt.Println("Database initialized successfully.")
 
 	case "seed-catalog":
-		err = dbStore.SeedCatalog(ctx)
+		err = dataStore.SeedCatalog(ctx)
 		if err != nil {
 			log.Printf("Failed to seed catalog: %v", err)
 			return 1
@@ -64,10 +68,10 @@ func run() int {
 		fmt.Println("Catalog seeded successfully with mock data.")
 
 	case "create":
-		err = cli.RunCreate(ctx, dbStore, args)
+		err = cli.RunCreate(ctx, dataStore, args)
 
 	case "add-products":
-		err = cli.RunAddProducts(ctx, dbStore, args)
+		err = cli.RunAddProducts(ctx, dataStore, args)
 
 	case "discover-kyc":
 		apiKey := os.Getenv("GEMINI_API_KEY")
@@ -82,47 +86,51 @@ func run() int {
 		}
 		defer aiAgent.Close()
 
-		err = cli.RunDiscoverKYC(ctx, dbStore, aiAgent, args)
+		err = cli.RunDiscoverKYC(ctx, dataStore, aiAgent, args)
 
 	case "discover-services":
-		err = cli.RunDiscoverServices(ctx, dbStore, args)
+		err = cli.RunDiscoverServices(ctx, dataStore, args)
 
 	case "discover-resources":
-		err = cli.RunDiscoverResources(ctx, dbStore, args)
+		err = cli.RunDiscoverResources(ctx, dataStore, args)
 
 	case "populate-attributes":
-		err = cli.RunPopulateAttributes(ctx, dbStore, args)
+		err = cli.RunPopulateAttributes(ctx, dataStore, args)
 
 	case "get-attribute-values":
-		err = cli.RunGetAttributeValues(ctx, dbStore, args)
+		err = cli.RunGetAttributeValues(ctx, dataStore, args)
 
 	// NEW COMMAND
 	case "history":
-		err = cli.RunHistory(ctx, dbStore, args)
+		err = cli.RunHistory(ctx, dataStore, args)
 
 	// CBU CRUD COMMANDS
 	case "cbu-create":
-		err = cli.RunCBUCreate(ctx, dbStore, args)
+		err = cli.RunCBUCreate(ctx, dataStore, args)
 	case "cbu-list":
-		err = cli.RunCBUList(ctx, dbStore, args)
+		err = cli.RunCBUList(ctx, dataStore, args)
 	case "cbu-get":
-		err = cli.RunCBUGet(ctx, dbStore, args)
+		err = cli.RunCBUGet(ctx, dataStore, args)
 	case "cbu-update":
-		err = cli.RunCBUUpdate(ctx, dbStore, args)
+		err = cli.RunCBUUpdate(ctx, dataStore, args)
 	case "cbu-delete":
-		err = cli.RunCBUDelete(ctx, dbStore, args)
+		err = cli.RunCBUDelete(ctx, dataStore, args)
 
 	// ROLE CRUD COMMANDS
 	case "role-create":
-		err = cli.RunRoleCreate(ctx, dbStore, args)
+		err = cli.RunRoleCreate(ctx, dataStore, args)
 	case "role-list":
-		err = cli.RunRoleList(ctx, dbStore, args)
+		err = cli.RunRoleList(ctx, dataStore, args)
 	case "role-get":
-		err = cli.RunRoleGet(ctx, dbStore, args)
+		err = cli.RunRoleGet(ctx, dataStore, args)
 	case "role-update":
-		err = cli.RunRoleUpdate(ctx, dbStore, args)
+		err = cli.RunRoleUpdate(ctx, dataStore, args)
 	case "role-delete":
-		err = cli.RunRoleDelete(ctx, dbStore, args)
+		err = cli.RunRoleDelete(ctx, dataStore, args)
+
+	// MOCK DATA EXPORT
+	case "export-mock-data":
+		err = cli.RunExportMockData(ctx, dataStore, args)
 
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
@@ -141,6 +149,10 @@ func run() int {
 func printUsage() {
 	fmt.Println("Onboarding DSL POC CLI (v8: Entity Relationship Model)")
 	fmt.Println("Usage: dsl-poc <command> [options]")
+	fmt.Println("\nEnvironment Variables:")
+	fmt.Println("  DSL_STORE_TYPE         Set to 'mock' for disconnected mode, 'postgresql' for database mode (default)")
+	fmt.Println("  DSL_MOCK_DATA_PATH     Path to mock data directory (default: data/mocks)")
+	fmt.Println("  DB_CONN_STRING         PostgreSQL connection string (required for database mode)")
 	fmt.Println("\nSetup Commands:")
 	fmt.Println("  init-db                      (One-time) Initializes the PostgreSQL schema and all tables.")
 	fmt.Println("  seed-catalog                 (One-time) Populates catalog tables with mock data.")
@@ -167,4 +179,5 @@ func printUsage() {
 	fmt.Println("  role-delete --id=<role-id>   Delete role")
 	fmt.Println("\nUtility Commands:")
 	fmt.Println("  history --cbu=<cbu-id>       Views the full, versioned DSL evolution for a case.")
+	fmt.Println("  export-mock-data [--dir=<path>] Exports existing database records to JSON mock files")
 }

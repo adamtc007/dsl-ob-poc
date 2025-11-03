@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"strings"
 
+	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
 	"dsl-ob-poc/internal/store"
 )
 
 // RunAddProducts handles the 'add-products' command.
-func RunAddProducts(ctx context.Context, s *store.Store, args []string) error {
+func RunAddProducts(ctx context.Context, ds datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("add-products", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID of the case to update (required)")
 	productsStr := fs.String("products", "", "Comma-separated list of products (required)")
@@ -32,7 +33,7 @@ func RunAddProducts(ctx context.Context, s *store.Store, args []string) error {
 	// 1. Validate products against the catalog
 	validProducts := make([]*store.Product, 0, len(productNames))
 	for _, name := range productNames {
-		p, err := s.GetProductByName(ctx, strings.TrimSpace(name))
+		p, err := ds.GetProductByName(ctx, strings.TrimSpace(name))
 		if err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -41,7 +42,7 @@ func RunAddProducts(ctx context.Context, s *store.Store, args []string) error {
 	fmt.Printf("Validated %d products against catalog.\n", len(validProducts))
 
 	// 2. Get the *current* state of the DSL from the DB
-	currentDSL, err := s.GetLatestDSL(ctx, *cbuID)
+	currentDSL, err := ds.GetLatestDSL(ctx, *cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to get current case for CBU %s: %w", *cbuID, err)
 	}
@@ -53,7 +54,7 @@ func RunAddProducts(ctx context.Context, s *store.Store, args []string) error {
 	}
 
 	// 4. Save the *new* DSL as a new immutable version
-	versionID, err := s.InsertDSL(ctx, *cbuID, newDSL)
+	versionID, err := ds.InsertDSL(ctx, *cbuID, newDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save updated case: %w", err)
 	}

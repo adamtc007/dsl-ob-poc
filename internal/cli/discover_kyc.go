@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"dsl-ob-poc/internal/agent"
+	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
-	"dsl-ob-poc/internal/store"
 )
 
 // RunDiscoverKYC handles the 'discover-kyc' command (new Step 3 powered by the AI agent).
-func RunDiscoverKYC(ctx context.Context, s *store.Store, ai *agent.Agent, args []string) error {
+func RunDiscoverKYC(ctx context.Context, ds datastore.DataStore, ai *agent.Agent, args []string) error {
 	fs := flag.NewFlagSet("discover-kyc", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID of the case to discover (required)")
 	if err := fs.Parse(args); err != nil {
@@ -32,7 +32,7 @@ func RunDiscoverKYC(ctx context.Context, s *store.Store, ai *agent.Agent, args [
 	log.Printf("Starting KYC discovery (Agent Step 3) for CBU: %s", *cbuID)
 
 	// 1. Get the latest DSL (should be v2).
-	currentDSL, err := s.GetLatestDSL(ctx, *cbuID)
+	currentDSL, err := ds.GetLatestDSL(ctx, *cbuID)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func RunDiscoverKYC(ctx context.Context, s *store.Store, ai *agent.Agent, args [
 	log.Printf("Found Products: %v", productNames)
 
 	// 4. Call the AI Agent to determine the *new desired* KYC requirements
-	log.Println("Calling AI Agent (Gemini) to determine KYC requirements...")
+	log.Println("Calling AI Agent (Gemini) to determine KYC requirementds...")
 	newReqs, err := ai.CallKYCAgent(ctx, naturePurpose, productNames)
 	if err != nil {
 		return fmt.Errorf("ai agent failed: %w", err)
@@ -89,7 +89,7 @@ func RunDiscoverKYC(ctx context.Context, s *store.Store, ai *agent.Agent, args [
 		strings.Join(diff.RemovedJuris, ","))
 
 	// 6. Save the new DSL version (v3).
-	versionID, err := s.InsertDSL(ctx, *cbuID, newDSL)
+	versionID, err := ds.InsertDSL(ctx, *cbuID, newDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save new DSL version: %w", err)
 	}

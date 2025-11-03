@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"strings"
 
-	"dsl-ob-poc/internal/store"
+	"dsl-ob-poc/internal/datastore"
 )
 
 // RunRoleCreate creates a new role
-func RunRoleCreate(ctx context.Context, store *store.Store, args []string) error {
+func RunRoleCreate(ctx context.Context, ds datastore.DataStore, args []string) error {
 	name, description, err := parseRoleCreateArgs(args)
 	if err != nil {
 		return err
 	}
 
-	roleID, err := store.CreateRole(ctx, name, description)
+	roleID, err := ds.CreateRole(ctx, name, description)
 	if err != nil {
 		return fmt.Errorf("failed to create role: %w", err)
 	}
@@ -25,8 +25,8 @@ func RunRoleCreate(ctx context.Context, store *store.Store, args []string) error
 }
 
 // RunRoleList lists all roles
-func RunRoleList(ctx context.Context, store *store.Store, args []string) error {
-	roles, err := store.ListRoles(ctx)
+func RunRoleList(ctx context.Context, ds datastore.DataStore, args []string) error {
+	roles, err := ds.ListRoles(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list roles: %w", err)
 	}
@@ -48,13 +48,13 @@ func RunRoleList(ctx context.Context, store *store.Store, args []string) error {
 }
 
 // RunRoleGet retrieves a specific role
-func RunRoleGet(ctx context.Context, store *store.Store, args []string) error {
+func RunRoleGet(ctx context.Context, ds datastore.DataStore, args []string) error {
 	roleID, err := parseRoleGetArgs(args)
 	if err != nil {
 		return err
 	}
 
-	role, err := store.GetRoleByID(ctx, roleID)
+	role, err := ds.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return fmt.Errorf("failed to get role: %w", err)
 	}
@@ -68,13 +68,13 @@ func RunRoleGet(ctx context.Context, store *store.Store, args []string) error {
 }
 
 // RunRoleUpdate updates a role
-func RunRoleUpdate(ctx context.Context, store *store.Store, args []string) error {
+func RunRoleUpdate(ctx context.Context, ds datastore.DataStore, args []string) error {
 	roleID, name, description, err := parseRoleUpdateArgs(args)
 	if err != nil {
 		return err
 	}
 
-	err = store.UpdateRole(ctx, roleID, name, description)
+	err = ds.UpdateRole(ctx, roleID, name, description)
 	if err != nil {
 		return fmt.Errorf("failed to update role: %w", err)
 	}
@@ -84,13 +84,13 @@ func RunRoleUpdate(ctx context.Context, store *store.Store, args []string) error
 }
 
 // RunRoleDelete deletes a role
-func RunRoleDelete(ctx context.Context, store *store.Store, args []string) error {
+func RunRoleDelete(ctx context.Context, ds datastore.DataStore, args []string) error {
 	roleID, err := parseRoleGetArgs(args)
 	if err != nil {
 		return err
 	}
 
-	err = store.DeleteRole(ctx, roleID)
+	err = ds.DeleteRole(ctx, roleID)
 	if err != nil {
 		return fmt.Errorf("failed to delete role: %w", err)
 	}

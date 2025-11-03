@@ -5,13 +5,13 @@ import (
 	"flag"
 	"fmt"
 
+	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
 	"dsl-ob-poc/internal/mocks"
-	"dsl-ob-poc/internal/store"
 )
 
 // RunCreate handles the 'create' command.
-func RunCreate(ctx context.Context, s *store.Store, args []string) error {
+func RunCreate(ctx context.Context, ds datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID for the new case (required)")
 	if err := fs.Parse(args); err != nil {
@@ -31,7 +31,7 @@ func RunCreate(ctx context.Context, s *store.Store, args []string) error {
 	// Generate the initial "CREATE" DSL
 	newDSL := dsl.CreateCase(mockCBU.CBUId, mockCBU.NaturePurpose)
 
-	versionID, err := s.InsertDSL(ctx, mockCBU.CBUId, newDSL)
+	versionID, err := ds.InsertDSL(ctx, mockCBU.CBUId, newDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save new case: %w", err)
 	}

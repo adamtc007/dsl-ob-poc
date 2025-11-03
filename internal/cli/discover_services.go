@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"log"
 
+	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
 	"dsl-ob-poc/internal/store"
 )
 
 // RunDiscoverServices handles the 'discover-services' command (Step 4).
-func RunDiscoverServices(ctx context.Context, s *store.Store, args []string) error {
+func RunDiscoverServices(ctx context.Context, ds datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("discover-services", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID of the case to discover (required)")
 	if err := fs.Parse(args); err != nil {
@@ -26,7 +27,7 @@ func RunDiscoverServices(ctx context.Context, s *store.Store, args []string) err
 	log.Printf("Starting service discovery (Step 4) for CBU: %s", *cbuID)
 
 	// 1. Get the latest DSL (should be v3)
-	currentDSL, err := s.GetLatestDSL(ctx, *cbuID)
+	currentDSL, err := ds.GetLatestDSL(ctx, *cbuID)
 	if err != nil {
 		return err
 	}
@@ -42,18 +43,18 @@ func RunDiscoverServices(ctx context.Context, s *store.Store, args []string) err
 	productServicesMap := make(map[string][]store.Service)
 
 	for _, productName := range productNames {
-		product, getErr := s.GetProductByName(ctx, productName)
+		product, getErr := ds.GetProductByName(ctx, productName)
 		if getErr != nil {
 			return getErr
 		}
 
-		services, getErr := s.GetServicesForProduct(ctx, product.ProductID)
+		services, getErr := ds.GetServicesForProduct(ctx, product.ProductID)
 		if getErr != nil {
 			return getErr
 		}
 		productServicesMap[product.Name] = services
 	}
-	log.Printf("Discovery complete: found services for %d products.", len(productServicesMap))
+	log.Printf("Discovery complete: found services for %d productds.", len(productServicesMap))
 
 	// 4. Generate the new DSL with the discovered services plan
 	plan := dsl.ServiceDiscoveryPlan{
@@ -66,7 +67,7 @@ func RunDiscoverServices(ctx context.Context, s *store.Store, args []string) err
 	}
 
 	// 5. Save the new DSL version (v4)
-	versionID, err := s.InsertDSL(ctx, *cbuID, newDSL)
+	versionID, err := ds.InsertDSL(ctx, *cbuID, newDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save new DSL version: %w", err)
 	}

@@ -7,11 +7,11 @@ import (
 	"log"
 	"time"
 
-	"dsl-ob-poc/internal/store"
+	"dsl-ob-poc/internal/datastore"
 )
 
 // RunHistory handles the 'history' command.
-func RunHistory(ctx context.Context, s *store.Store, args []string) error {
+func RunHistory(ctx context.Context, ds datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("history", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID of the case to view (required)")
 	if err := fs.Parse(args); err != nil {
@@ -26,7 +26,7 @@ func RunHistory(ctx context.Context, s *store.Store, args []string) error {
 	log.Printf("Fetching DSL history for CBU: %s", *cbuID)
 
 	// 1. Get all DSL versions from the store
-	history, err := s.GetDSLHistory(ctx, *cbuID)
+	history, err := ds.GetDSLHistory(ctx, *cbuID)
 	if err != nil {
 		return err
 	}

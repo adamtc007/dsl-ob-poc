@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"strings"
 
-	"dsl-ob-poc/internal/store"
+	"dsl-ob-poc/internal/datastore"
 )
 
 // RunCBUCreate creates a new CBU
-func RunCBUCreate(ctx context.Context, store *store.Store, args []string) error {
+func RunCBUCreate(ctx context.Context, ds datastore.DataStore, args []string) error {
 	name, description, naturePurpose, err := parseCBUCreateArgs(args)
 	if err != nil {
 		return err
 	}
 
-	cbuID, err := store.CreateCBU(ctx, name, description, naturePurpose)
+	cbuID, err := ds.CreateCBU(ctx, name, description, naturePurpose)
 	if err != nil {
 		return fmt.Errorf("failed to create CBU: %w", err)
 	}
@@ -25,8 +25,8 @@ func RunCBUCreate(ctx context.Context, store *store.Store, args []string) error 
 }
 
 // RunCBUList lists all CBUs
-func RunCBUList(ctx context.Context, store *store.Store, args []string) error {
-	cbus, err := store.ListCBUs(ctx)
+func RunCBUList(ctx context.Context, ds datastore.DataStore, args []string) error {
+	cbus, err := ds.ListCBUs(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list CBUs: %w", err)
 	}
@@ -49,13 +49,13 @@ func RunCBUList(ctx context.Context, store *store.Store, args []string) error {
 }
 
 // RunCBUGet retrieves a specific CBU
-func RunCBUGet(ctx context.Context, store *store.Store, args []string) error {
+func RunCBUGet(ctx context.Context, ds datastore.DataStore, args []string) error {
 	cbuID, err := parseCBUGetArgs(args)
 	if err != nil {
 		return err
 	}
 
-	cbu, err := store.GetCBUByID(ctx, cbuID)
+	cbu, err := ds.GetCBUByID(ctx, cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to get CBU: %w", err)
 	}
@@ -70,13 +70,13 @@ func RunCBUGet(ctx context.Context, store *store.Store, args []string) error {
 }
 
 // RunCBUUpdate updates a CBU
-func RunCBUUpdate(ctx context.Context, store *store.Store, args []string) error {
+func RunCBUUpdate(ctx context.Context, ds datastore.DataStore, args []string) error {
 	cbuID, name, description, naturePurpose, err := parseCBUUpdateArgs(args)
 	if err != nil {
 		return err
 	}
 
-	err = store.UpdateCBU(ctx, cbuID, name, description, naturePurpose)
+	err = ds.UpdateCBU(ctx, cbuID, name, description, naturePurpose)
 	if err != nil {
 		return fmt.Errorf("failed to update CBU: %w", err)
 	}
@@ -86,13 +86,13 @@ func RunCBUUpdate(ctx context.Context, store *store.Store, args []string) error 
 }
 
 // RunCBUDelete deletes a CBU
-func RunCBUDelete(ctx context.Context, store *store.Store, args []string) error {
+func RunCBUDelete(ctx context.Context, ds datastore.DataStore, args []string) error {
 	cbuID, err := parseCBUGetArgs(args)
 	if err != nil {
 		return err
 	}
 
-	err = store.DeleteCBU(ctx, cbuID)
+	err = ds.DeleteCBU(ctx, cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to delete CBU: %w", err)
 	}

@@ -21,33 +21,33 @@ type Store struct {
 
 // CBU represents a Client Business Unit in the catalog.
 type CBU struct {
-	CBUID         string
-	Name          string
-	Description   string
-	NaturePurpose string
+	CBUID         string `json:"cbu_id"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	NaturePurpose string `json:"nature_purpose"`
 }
 
 // Product represents a product in the catalog.
 type Product struct {
-	ProductID   string
-	Name        string
-	Description string
+	ProductID   string `json:"product_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // Service represents a service in the catalog.
 type Service struct {
-	ServiceID   string
-	Name        string
-	Description string
+	ServiceID   string `json:"service_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // ProdResource represents a resource required by products/services.
 type ProdResource struct {
-	ResourceID      string
-	Name            string
-	Description     string
-	Owner           string
-	DictionaryGroup string
+	ResourceID      string `json:"resource_id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Owner           string `json:"owner"`
+	DictionaryGroup string `json:"dictionary_group"`
 }
 
 // Attribute represents an attribute in the dictionary (v3 schema).
@@ -65,68 +65,68 @@ type Attribute struct {
 
 // Role represents a role that entities can play within a CBU.
 type Role struct {
-	RoleID      string
-	Name        string
-	Description string
+	RoleID      string `json:"role_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // EntityType represents the different types of entities.
 type EntityType struct {
-	EntityTypeID string
-	Name         string
-	Description  string
-	TableName    string
+	EntityTypeID string `json:"entity_type_id"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	TableName    string `json:"table_name"`
 }
 
 // Entity represents an entity in the central registry.
 type Entity struct {
-	EntityID     string
-	EntityTypeID string
-	ExternalID   string
-	Name         string
+	EntityID     string `json:"entity_id"`
+	EntityTypeID string `json:"entity_type_id"`
+	ExternalID   string `json:"external_id"`
+	Name         string `json:"name"`
 }
 
 // CBUEntityRole represents the relationship between CBUs, entities, and roles.
 type CBUEntityRole struct {
-	CBUEntityRoleID string
-	CBUID           string
-	EntityID        string
-	RoleID          string
+	CBUEntityRoleID string `json:"cbu_entity_role_id"`
+	CBUID           string `json:"cbu_id"`
+	EntityID        string `json:"entity_id"`
+	RoleID          string `json:"role_id"`
 }
 
 // LimitedCompany represents a limited company entity.
 type LimitedCompany struct {
-	LimitedCompanyID   string
-	CompanyName        string
-	RegistrationNumber string
-	Jurisdiction       string
-	IncorporationDate  *time.Time
-	RegisteredAddress  string
-	BusinessNature     string
+	LimitedCompanyID   string     `json:"limited_company_id"`
+	CompanyName        string     `json:"company_name"`
+	RegistrationNumber string     `json:"registration_number"`
+	Jurisdiction       string     `json:"jurisdiction"`
+	IncorporationDate  *time.Time `json:"incorporation_date"`
+	RegisteredAddress  string     `json:"registered_address"`
+	BusinessNature     string     `json:"business_nature"`
 }
 
 // Partnership represents a partnership entity.
 type Partnership struct {
-	PartnershipID            string
-	PartnershipName          string
-	PartnershipType          string
-	Jurisdiction             string
-	FormationDate            *time.Time
-	PrincipalPlaceBusiness   string
-	PartnershipAgreementDate *time.Time
+	PartnershipID            string     `json:"partnership_id"`
+	PartnershipName          string     `json:"partnership_name"`
+	PartnershipType          string     `json:"partnership_type"`
+	Jurisdiction             string     `json:"jurisdiction"`
+	FormationDate            *time.Time `json:"formation_date"`
+	PrincipalPlaceBusiness   string     `json:"principal_place_business"`
+	PartnershipAgreementDate *time.Time `json:"partnership_agreement_date"`
 }
 
 // Individual represents an individual (proper person) entity.
 type Individual struct {
-	IndividualID     string
-	FirstName        string
-	LastName         string
-	MiddleNames      string
-	DateOfBirth      *time.Time
-	Nationality      string
-	ResidenceAddress string
-	IDDocumentType   string
-	IDDocumentNumber string
+	IndividualID     string     `json:"individual_id"`
+	FirstName        string     `json:"first_name"`
+	LastName         string     `json:"last_name"`
+	MiddleNames      string     `json:"middle_names"`
+	DateOfBirth      *time.Time `json:"date_of_birth"`
+	Nationality      string     `json:"nationality"`
+	ResidenceAddress string     `json:"residence_address"`
+	IDDocumentType   string     `json:"id_document_type"`
+	IDDocumentNumber string     `json:"id_document_number"`
 }
 
 // NewStore creates a new Store instance and opens a database connection.

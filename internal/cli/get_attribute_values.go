@@ -7,8 +7,8 @@ import (
 	"log"
 	"regexp"
 
+	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
-	"dsl-ob-poc/internal/store"
 )
 
 // looksLikeUUID checks if a string looks like a UUID
@@ -18,7 +18,7 @@ func looksLikeUUID(s string) bool {
 }
 
 // RunGetAttributeValues implements the get-attribute-values command
-func RunGetAttributeValues(ctx context.Context, s *store.Store, args []string) error {
+func RunGetAttributeValues(ctx context.Context, ds datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("get-attribute-values", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID of the case to process (required)")
 
@@ -33,7 +33,7 @@ func RunGetAttributeValues(ctx context.Context, s *store.Store, args []string) e
 	log.Printf("Getting attribute values for CBU: %s", *cbuID)
 
 	// 1) Get latest DSL + version
-	latest, err := s.GetLatestDSL(ctx, *cbuID)
+	latest, err := ds.GetLatestDSL(ctx, *cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest DSL: %w", err)
 	}
@@ -43,7 +43,7 @@ func RunGetAttributeValues(ctx context.Context, s *store.Store, args []string) e
 
 	// 2) Normalize any shorthand vars (needs a resolver using the dictionary)
 	norm := dsl.NormalizeVars(latest, func(sym string) (string, bool) {
-		a, _ := s.GetDictionaryAttributeByName(ctx, sym)
+		a, _ := ds.GetDictionaryAttributeByName(ctx, sym)
 		if a != nil {
 			return a.AttributeID, true
 		}
@@ -61,12 +61,12 @@ func RunGetAttributeValues(ctx context.Context, s *store.Store, args []string) e
 	// 4) Resolve & persist
 	assignments := map[string]string{}
 	for _, attrID := range ids {
-		val, prov, state, err := s.ResolveValueFor(ctx, *cbuID, attrID)
+		val, prov, state, err := ds.ResolveValueFor(ctx, *cbuID, attrID)
 		if err != nil {
 			return fmt.Errorf("failed to resolve value for %s: %w", attrID, err)
 		}
 
-		if err := s.UpsertAttributeValue(ctx, *cbuID, version, attrID, val, state, prov); err != nil {
+		if err := ds.UpsertAttributeValue(ctx, *cbuID, version, attrID, val, state, prov); err != nil {
 			return fmt.Errorf("failed to store value for %s: %w", attrID, err)
 		}
 
@@ -78,11 +78,11 @@ func RunGetAttributeValues(ctx context.Context, s *store.Store, args []string) e
 		}
 	}
 
-	// 5) Emit a new DSL version with a `(values.bind ...)` block
+	// 5) Emit a new DSL version with a `(valueds.bind ...)` block
 	bind := dsl.RenderBindings(assignments)
 	finalDSL := norm + "\n\n" + bind
 
-	versionID, err := s.InsertDSL(ctx, *cbuID, finalDSL)
+	versionID, err := ds.InsertDSL(ctx, *cbuID, finalDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save final DSL: %w", err)
 	}

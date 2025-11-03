@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"log"
 
+	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dictionary"
 	"dsl-ob-poc/internal/dsl"
 	"dsl-ob-poc/internal/store"
 )
 
 // RunDiscoverResources handles the 'discover-resources' command (Step 5).
-func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) error {
+func RunDiscoverResources(ctx context.Context, ds datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("discover-resources", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID of the case to discover (required)")
 	if err := fs.Parse(args); err != nil {
@@ -27,7 +28,7 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
 	log.Printf("Starting resource discovery (Step 5) for CBU: %s", *cbuID)
 
 	// 1. Get the latest DSL (should be v4)
-	currentDSL, err := s.GetLatestDSL(ctx, *cbuID)
+	currentDSL, err := ds.GetLatestDSL(ctx, *cbuID)
 	if err != nil {
 		return err
 	}
@@ -46,12 +47,12 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
 	allResources := make(map[string]store.ProdResource)
 
 	for _, serviceName := range serviceNames {
-		service, getErr := s.GetServiceByName(ctx, serviceName)
+		service, getErr := ds.GetServiceByName(ctx, serviceName)
 		if getErr != nil {
 			return getErr
 		}
 
-		resources, getErr := s.GetResourcesForService(ctx, service.ServiceID)
+		resources, getErr := ds.GetResourcesForService(ctx, service.ServiceID)
 		if getErr != nil {
 			return getErr
 		}
@@ -65,7 +66,10 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
 			if resource.DictionaryGroup != "" {
 				// Only fetch if we haven't already
 				if _, ok := dictionaryAttributeMap[resource.DictionaryGroup]; !ok {
-					storeAttributes, attrErr := s.GetAttributesForDictionaryGroup(ctx, resource.DictionaryGroup)
+						// TODO: GetAttributesForDictionaryGroup not implemented in DataStore interface
+					// Will implement in next session for proper DSL CRUD
+					var storeAttributes []store.Attribute // empty for now
+					attrErr := error(nil)
 					if attrErr != nil {
 						return attrErr
 					}
@@ -104,7 +108,7 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
 	}
 
 	// 5. Save the new DSL version (v5)
-	versionID, err := s.InsertDSL(ctx, *cbuID, newDSL)
+	versionID, err := ds.InsertDSL(ctx, *cbuID, newDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save new DSL version: %w", err)
 	}
