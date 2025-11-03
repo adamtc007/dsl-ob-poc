@@ -109,6 +109,24 @@ goose -dir db/migrations postgres "$DATABASE_URL" down
 - **TRGM**: pg_trgm extension must exist before GIN index
 - **Idempotency**: Apply `Step.ApplyIdempotency()` before persisting
 
+## Critical Non-Functional Requirements
+
+### 🚨 Rollback and Re-Run Capability (Priority 1)
+**All hedge fund investor implementation changes MUST be able to be backed out and potentially re-run.**
+
+**Technical Approaches:**
+- **Database Migrations**: Complete up/down migration pairs with dependency-aware rollback
+- **Feature Flags**: Runtime toggles for hedge fund investor functionality
+- **Interface Isolation**: Clean abstraction boundaries allowing hot-swapping implementations
+- **State Isolation**: Separate schema/tables that can be cleanly dropped without affecting core system
+- **Event Sourcing**: Immutable event streams enable point-in-time rollback and replay
+- **Library Versioning**: Semantic versioning with backward compatibility guarantees
+
+**Rollback Testing:**
+- Automated rollback tests for each migration
+- Integration test suites that verify core system integrity after hedge fund module removal
+- Performance baseline tests to ensure rollback doesn't degrade existing functionality
+
 ## Implementation Todo (Staged Approach)
 
 ### 🟡 Stage 1: Core Infrastructure (Week 1-2)
