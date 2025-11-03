@@ -96,7 +96,7 @@ vet:
 lint:
 	@echo "Running golangci-lint..."
 	@if command -v $(GOLANGCI_LINT) >/dev/null 2>&1; then \
-		GOCACHE=$(PWD)/.gocache $(GOLANGCI_LINT) run -v ./...; \
+		GOCACHE=$(PWD)/.gocache GOLANGCI_LINT_CACHE=$(PWD)/.gocache/golangci-lint $(GOLANGCI_LINT) run -v ./...; \
 	else \
 		echo "golangci-lint is not installed. Install it from https://golangci-lint.run/usage/install/"; \
 		exit 1; \
