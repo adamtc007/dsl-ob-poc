@@ -52,7 +52,7 @@ This application is a proof-of-concept for the client onboarding DSL, with all s
     ```
 
 4.  **Initialize the Database:**
-    Run the `init-db` command. This only needs to be done once. It creates the `"kyc-dsl"` schema and the `"dsl_ob"` table.
+    Run the `init-db` command. This only needs to be done once. It creates the `"dsl-ob-poc"` schema and the `"dsl_ob"` table.
 
     ```sh
     ./dsl-poc init-db

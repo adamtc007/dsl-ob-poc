@@ -255,7 +255,7 @@ dsl-ob-poc/
 3. ✅ Create test cases with `./dsl-poc create --cbu="..."`
 4. ✅ Query PostgreSQL to verify immutable versions:
    ```sql
-   SELECT version_id, cbu_id, created_at FROM "kyc-dsl".dsl_ob ORDER BY created_at DESC;
+   SELECT version_id, cbu_id, created_at FROM "dsl-ob-poc".dsl_ob ORDER BY created_at DESC;
    ```
 
 ### For Production Deployment
@@ -287,7 +287,7 @@ make build-greenteagc
 ./dsl-poc add-products --cbu="TEST-001" --products="FUND_ACCOUNTING"
 
 # Verify in database
-psql $DB_CONN_STRING -c 'SELECT version_id, dsl_text FROM "kyc-dsl".dsl_ob WHERE cbu_id = '\''TEST-001'\'';'
+psql $DB_CONN_STRING -c 'SELECT version_id, dsl_text FROM "dsl-ob-poc".dsl_ob WHERE cbu_id = '\''TEST-001'\'';'
 ```
 
 ### Testing a New Build

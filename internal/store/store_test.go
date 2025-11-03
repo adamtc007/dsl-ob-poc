@@ -26,8 +26,8 @@ func TestGetDSLHistory_ReturnsOrderedResults(t *testing.T) {
 		AddRow("11111111-1111-1111-1111-111111111111", t1, "(dsl version 1)").
 		AddRow("22222222-2222-2222-2222-222222222222", t2, "(dsl version 2)")
 
-	query := regexp.QuoteMeta(`SELECT version_id::text, created_at, dsl_text
-         FROM "kyc-dsl".dsl_ob
+    query := regexp.QuoteMeta(`SELECT version_id::text, created_at, dsl_text
+         FROM "dsl-ob-poc".dsl_ob
          WHERE cbu_id = $1
          ORDER BY created_at ASC`)
 	mock.ExpectQuery(query).WithArgs(cbu).WillReturnRows(rows)

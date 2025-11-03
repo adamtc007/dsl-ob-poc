@@ -1,8 +1,8 @@
 -- Creates the schema and tables for the DSL POC
-CREATE SCHEMA IF NOT EXISTS "kyc-dsl";
+CREATE SCHEMA IF NOT EXISTS "dsl-ob-poc";
 
 -- Table to store immutable, versioned DSL files
-CREATE TABLE IF NOT EXISTS "kyc-dsl".dsl_ob (
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
     -- Use a UUID for the version ID
     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
@@ -18,14 +18,14 @@ CREATE TABLE IF NOT EXISTS "kyc-dsl".dsl_ob (
 
 -- Index for fast lookups of the latest DSL for a CBU
 CREATE INDEX IF NOT EXISTS idx_dsl_ob_cbu_id_created_at
-ON "kyc-dsl".dsl_ob (cbu_id, created_at DESC);
+ON "dsl-ob-poc".dsl_ob (cbu_id, created_at DESC);
 
 -- ============================================================================
 -- NEW TABLES FOR PRODUCT CATALOG, SERVICES, RESOURCES, AND METADATA
 -- ============================================================================
 
 -- Products table: Core product definitions
-CREATE TABLE IF NOT EXISTS "kyc-dsl".products (
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
     product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -33,10 +33,10 @@ CREATE TABLE IF NOT EXISTS "kyc-dsl".products (
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX IF NOT EXISTS idx_products_name ON "kyc-dsl".products (name);
+CREATE INDEX IF NOT EXISTS idx_products_name ON "dsl-ob-poc".products (name);
 
 -- Services table: Services that can be offered with or without products
-CREATE TABLE IF NOT EXISTS "kyc-dsl".services (
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".services (
     service_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -44,10 +44,10 @@ CREATE TABLE IF NOT EXISTS "kyc-dsl".services (
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX IF NOT EXISTS idx_services_name ON "kyc-dsl".services (name);
+CREATE INDEX IF NOT EXISTS idx_services_name ON "dsl-ob-poc".services (name);
 
 -- Product Resources table: Resources required by products/services
-CREATE TABLE IF NOT EXISTS "kyc-dsl".prod_resources (
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
     resource_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -58,11 +58,11 @@ CREATE TABLE IF NOT EXISTS "kyc-dsl".prod_resources (
     -- Note: dictionary_id will reference dictionaries table via FK after that table is created
 );
 
-CREATE INDEX IF NOT EXISTS idx_prod_resources_name ON "kyc-dsl".prod_resources (name);
-CREATE INDEX IF NOT EXISTS idx_prod_resources_owner ON "kyc-dsl".prod_resources (owner);
+CREATE INDEX IF NOT EXISTS idx_prod_resources_name ON "dsl-ob-poc".prod_resources (name);
+CREATE INDEX IF NOT EXISTS idx_prod_resources_owner ON "dsl-ob-poc".prod_resources (owner);
 
 -- Dictionaries table: Master data dictionaries that contain attributes
-CREATE TABLE IF NOT EXISTS "kyc-dsl".dictionaries (
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionaries (
     dictionary_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -72,10 +72,10 @@ CREATE TABLE IF NOT EXISTS "kyc-dsl".dictionaries (
     -- Note: attribute_id will reference attributes table via FK after that table is created
 );
 
-CREATE INDEX IF NOT EXISTS idx_dictionaries_name ON "kyc-dsl".dictionaries (name);
+CREATE INDEX IF NOT EXISTS idx_dictionaries_name ON "dsl-ob-poc".dictionaries (name);
 
 -- Attributes table: Detailed attribute definitions with metadata
-CREATE TABLE IF NOT EXISTS "kyc-dsl".attributes (
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".attributes (
     attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     detailed_description TEXT,
@@ -95,15 +95,15 @@ CREATE TABLE IF NOT EXISTS "kyc-dsl".attributes (
     CONSTRAINT chk_data_type CHECK (data_type IN ('string', 'mask', 'struct'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_attributes_name ON "kyc-dsl".attributes (name);
-CREATE INDEX IF NOT EXISTS idx_attributes_is_private ON "kyc-dsl".attributes (is_private);
-CREATE INDEX IF NOT EXISTS idx_attributes_private_type ON "kyc-dsl".attributes (private_type);
+CREATE INDEX IF NOT EXISTS idx_attributes_name ON "dsl-ob-poc".attributes (name);
+CREATE INDEX IF NOT EXISTS idx_attributes_is_private ON "dsl-ob-poc".attributes (is_private);
+CREATE INDEX IF NOT EXISTS idx_attributes_private_type ON "dsl-ob-poc".attributes (private_type);
 
 -- Add foreign key constraints now that all tables exist
-ALTER TABLE "kyc-dsl".prod_resources
+ALTER TABLE "dsl-ob-poc".prod_resources
 ADD CONSTRAINT fk_prod_resources_dictionary
-FOREIGN KEY (dictionary_id) REFERENCES "kyc-dsl".dictionaries (dictionary_id) ON DELETE SET NULL;
+FOREIGN KEY (dictionary_id) REFERENCES "dsl-ob-poc".dictionaries (dictionary_id) ON DELETE SET NULL;
 
-ALTER TABLE "kyc-dsl".dictionaries
+ALTER TABLE "dsl-ob-poc".dictionaries
 ADD CONSTRAINT fk_dictionaries_attribute
-FOREIGN KEY (attribute_id) REFERENCES "kyc-dsl".attributes (attribute_id) ON DELETE SET NULL;
+FOREIGN KEY (attribute_id) REFERENCES "dsl-ob-poc".attributes (attribute_id) ON DELETE SET NULL;

@@ -27,6 +27,7 @@ help:
 	@echo ""
 	@echo "Database targets:"
 	@echo "  make init-db            - Initialize the database (requires DB_CONN_STRING)"
+	@echo "  make migrate-schema     - Rename schema kyc-dsl -> dsl-ob-poc (requires DB_CONN_STRING)"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  DB_CONN_STRING - PostgreSQL connection string (required for init-db)"
@@ -39,17 +40,28 @@ help:
 	@echo "  ./dsl-poc create --cbu=\"CBU-1234\""
 
 build: install-deps
-	$(GO) build $(GOFLAGS) -o $(OUTPUT) .
+	GOCACHE=$(PWD)/.gocache $(GO) build $(GOFLAGS) -o $(OUTPUT) .
 
 build-greenteagc: install-deps
-	GOEXPERIMENT=greenteagc $(GO) build $(GOFLAGS) -o $(OUTPUT) .
+	GOCACHE=$(PWD)/.gocache GOEXPERIMENT=greenteagc $(GO) build $(GOFLAGS) -o $(OUTPUT) .
 
 install-deps:
-	$(GO) mod tidy
-	$(GO) mod download
+	GOCACHE=$(PWD)/.gocache $(GO) mod tidy
+	GOCACHE=$(PWD)/.gocache $(GO) mod download
 
 init-db: build-greenteagc
 	./$(OUTPUT) init-db
+
+migrate-schema:
+	@if [ -z "$$DB_CONN_STRING" ]; then \
+		echo "DB_CONN_STRING is not set"; \
+		exit 1; \
+	fi
+	@if ! command -v psql >/dev/null 2>&1; then \
+		echo "psql is not installed or not in PATH"; \
+		exit 1; \
+	fi
+	psql "$$DB_CONN_STRING" -v ON_ERROR_STOP=1 -f sql/migrate_kyc-dsl_to_dsl-ob-poc.sql
 
 clean:
 	$(GO) clean

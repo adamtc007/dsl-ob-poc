@@ -7,7 +7,7 @@ This document describes the complete database schema for the DSL Onboarding POC,
 ## Schema Structure
 
 ```
-kyc-dsl (schema)
+dsl-ob-poc (schema)
 ├── Core Tables
 │   └── dsl_ob (immutable versioned DSL records)
 ├── Product & Service Configuration

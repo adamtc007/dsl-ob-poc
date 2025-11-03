@@ -130,8 +130,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	productIDs := make(map[string]string)
 	for _, p := range products {
 		var productID string
-		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "kyc-dsl".products (name, description)
+    queryErr := tx.QueryRowContext(ctx,
+            `INSERT INTO "dsl-ob-poc".products (name, description)
 			 VALUES ($1, $2)
 			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
 			 RETURNING product_id`,
@@ -156,8 +156,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	serviceIDs := make(map[string]string)
 	for _, srv := range services {
 		var serviceID string
-		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "kyc-dsl".services (name, description)
+    queryErr := tx.QueryRowContext(ctx,
+            `INSERT INTO "dsl-ob-poc".services (name, description)
 			 VALUES ($1, $2)
 			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
 			 RETURNING service_id`,
@@ -180,8 +180,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	}
 
 	for _, link := range productServiceLinks {
-		_, execErr := tx.ExecContext(ctx,
-			`INSERT INTO "kyc-dsl".product_services (product_id, service_id)
+        _, execErr := tx.ExecContext(ctx,
+            `INSERT INTO "dsl-ob-poc".product_services (product_id, service_id)
 			 VALUES ($1, $2)
 			 ON CONFLICT DO NOTHING`,
 			productIDs[link.product], serviceIDs[link.service])
@@ -209,8 +209,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	attributeIDs := make(map[string]string)
 	for _, attr := range attributes {
 		var attributeID string
-		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "kyc-dsl".attributes (name, detailed_description, is_private, private_type, data_type, primary_sink_url, primary_source_url)
+    queryErr := tx.QueryRowContext(ctx,
+            `INSERT INTO "dsl-ob-poc".attributes (name, detailed_description, is_private, private_type, data_type, primary_sink_url, primary_source_url)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7)
 			 ON CONFLICT (name) DO UPDATE SET detailed_description = EXCLUDED.detailed_description
 			 RETURNING attribute_id`,
@@ -234,8 +234,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	dictionaryIDs := make(map[string]string)
 	for _, dict := range dictionaries {
 		var dictionaryID string
-		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "kyc-dsl".dictionaries (name, description)
+    queryErr := tx.QueryRowContext(ctx,
+            `INSERT INTO "dsl-ob-poc".dictionaries (name, description)
 			 VALUES ($1, $2)
 			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
 			 RETURNING dictionary_id`,
@@ -261,8 +261,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	}
 
 	for _, link := range dictionaryAttributeLinks {
-		_, execErr := tx.ExecContext(ctx,
-			`INSERT INTO "kyc-dsl".dictionary_attributes (dictionary_id, attribute_id, is_required)
+        _, execErr := tx.ExecContext(ctx,
+            `INSERT INTO "dsl-ob-poc".dictionary_attributes (dictionary_id, attribute_id, is_required)
 			 VALUES ($1, $2, $3)
 			 ON CONFLICT DO NOTHING`,
 			dictionaryIDs[link.dictionary], attributeIDs[link.attribute], link.required)
@@ -286,8 +286,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	resourceIDs := make(map[string]string)
 	for _, res := range resources {
 		var resourceID string
-		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "kyc-dsl".prod_resources (name, description, owner, dictionary_id)
+    queryErr := tx.QueryRowContext(ctx,
+            `INSERT INTO "dsl-ob-poc".prod_resources (name, description, owner, dictionary_id)
 			 VALUES ($1, $2, $3, $4)
 			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
 			 RETURNING resource_id`,
@@ -310,8 +310,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 	}
 
 	for _, link := range serviceResourceLinks {
-		_, execErr := tx.ExecContext(ctx,
-			`INSERT INTO "kyc-dsl".service_resources (service_id, resource_id)
+        _, execErr := tx.ExecContext(ctx,
+            `INSERT INTO "dsl-ob-poc".service_resources (service_id, resource_id)
 			 VALUES ($1, $2)
 			 ON CONFLICT DO NOTHING`,
 			serviceIDs[link.service], resourceIDs[link.resource])
@@ -326,8 +326,8 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 // InsertDSL inserts a new DSL version and returns its version ID.
 func (s *Store) InsertDSL(ctx context.Context, cbuID, dslText string) (string, error) {
 	var versionID string
-	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO "kyc-dsl".dsl_ob (cbu_id, dsl_text) VALUES ($1, $2) RETURNING version_id`,
+    err := s.db.QueryRowContext(ctx,
+            `INSERT INTO "dsl-ob-poc".dsl_ob (cbu_id, dsl_text) VALUES ($1, $2) RETURNING version_id`,
 		cbuID, dslText).Scan(&versionID)
 	if err != nil {
 		return "", fmt.Errorf("failed to insert DSL: %w", err)
@@ -338,8 +338,8 @@ func (s *Store) InsertDSL(ctx context.Context, cbuID, dslText string) (string, e
 // GetLatestDSL retrieves the most recent DSL for a given CBU ID.
 func (s *Store) GetLatestDSL(ctx context.Context, cbuID string) (string, error) {
 	var dslText string
-	err := s.db.QueryRowContext(ctx,
-		`SELECT dsl_text FROM "kyc-dsl".dsl_ob
+    err := s.db.QueryRowContext(ctx,
+            `SELECT dsl_text FROM "dsl-ob-poc".dsl_ob
 		 WHERE cbu_id = $1
 		 ORDER BY created_at DESC
 		 LIMIT 1`,
@@ -362,9 +362,9 @@ type DSLVersion struct {
 
 // GetDSLHistory returns all DSL versions for a given CBU ID ordered by creation time.
 func (s *Store) GetDSLHistory(ctx context.Context, cbuID string) ([]DSLVersion, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT version_id::text, created_at, dsl_text
-         FROM "kyc-dsl".dsl_ob
+    rows, err := s.db.QueryContext(ctx,
+            `SELECT version_id::text, created_at, dsl_text
+         FROM "dsl-ob-poc".dsl_ob
          WHERE cbu_id = $1
          ORDER BY created_at ASC`, cbuID)
 	if err != nil {
@@ -390,8 +390,8 @@ func (s *Store) GetDSLHistory(ctx context.Context, cbuID string) ([]DSLVersion, 
 // GetProductByName retrieves a product by name from the catalog.
 func (s *Store) GetProductByName(ctx context.Context, name string) (*Product, error) {
 	var p Product
-	err := s.db.QueryRowContext(ctx,
-		`SELECT product_id, name, description FROM "kyc-dsl".products WHERE name = $1`,
+    err := s.db.QueryRowContext(ctx,
+            `SELECT product_id, name, description FROM "dsl-ob-poc".products WHERE name = $1`,
 		name).Scan(&p.ProductID, &p.Name, &p.Description)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("product '%s' not found in catalog", name)
@@ -404,10 +404,10 @@ func (s *Store) GetProductByName(ctx context.Context, name string) (*Product, er
 
 // GetServicesForProduct retrieves all services associated with a product.
 func (s *Store) GetServicesForProduct(ctx context.Context, productID string) ([]Service, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT s.service_id, s.name, s.description
-		 FROM "kyc-dsl".services s
-		 JOIN "kyc-dsl".product_services ps ON s.service_id = ps.service_id
+    rows, err := s.db.QueryContext(ctx,
+            `SELECT s.service_id, s.name, s.description
+         FROM "dsl-ob-poc".services s
+         JOIN "dsl-ob-poc".product_services ps ON s.service_id = ps.service_id
 		 WHERE ps.product_id = $1`,
 		productID)
 	if err != nil {
@@ -434,8 +434,8 @@ func (s *Store) GetServicesForProduct(ctx context.Context, productID string) ([]
 // GetServiceByName retrieves a service by name from the catalog.
 func (s *Store) GetServiceByName(ctx context.Context, name string) (*Service, error) {
 	var srv Service
-	err := s.db.QueryRowContext(ctx,
-		`SELECT service_id, name, description FROM "kyc-dsl".services WHERE name = $1`,
+    err := s.db.QueryRowContext(ctx,
+            `SELECT service_id, name, description FROM "dsl-ob-poc".services WHERE name = $1`,
 		name).Scan(&srv.ServiceID, &srv.Name, &srv.Description)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("service '%s' not found in catalog", name)
@@ -448,10 +448,10 @@ func (s *Store) GetServiceByName(ctx context.Context, name string) (*Service, er
 
 // GetResourcesForService retrieves all resources associated with a service.
 func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([]ProdResource, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT r.resource_id, r.name, r.description, r.owner, COALESCE(r.dictionary_id::text, '')
-		 FROM "kyc-dsl".prod_resources r
-		 JOIN "kyc-dsl".service_resources sr ON r.resource_id = sr.resource_id
+    rows, err := s.db.QueryContext(ctx,
+            `SELECT r.resource_id, r.name, r.description, r.owner, COALESCE(r.dictionary_id::text, '')
+         FROM "dsl-ob-poc".prod_resources r
+         JOIN "dsl-ob-poc".service_resources sr ON r.resource_id = sr.resource_id
 		 WHERE sr.service_id = $1`,
 		serviceID)
 	if err != nil {
@@ -477,12 +477,12 @@ func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([
 
 // GetAttributesForDictionary retrieves all attributes for a given dictionary.
 func (s *Store) GetAttributesForDictionary(ctx context.Context, dictionaryID string) ([]Attribute, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT a.attribute_id, a.name, COALESCE(a.detailed_description, ''),
-		        a.is_private, a.private_type, a.data_type, a.primary_sink_url,
-		        a.primary_source_url, a.secondary_source_url, a.tertiary_source_url
-		 FROM "kyc-dsl".attributes a
-		 JOIN "kyc-dsl".dictionary_attributes da ON a.attribute_id = da.attribute_id
+    rows, err := s.db.QueryContext(ctx,
+            `SELECT a.attribute_id, a.name, COALESCE(a.detailed_description, ''),
+                a.is_private, a.private_type, a.data_type, a.primary_sink_url,
+                a.primary_source_url, a.secondary_source_url, a.tertiary_source_url
+         FROM "dsl-ob-poc".attributes a
+         JOIN "dsl-ob-poc".dictionary_attributes da ON a.attribute_id = da.attribute_id
 		 WHERE da.dictionary_id = $1`,
 		dictionaryID)
 	if err != nil {
