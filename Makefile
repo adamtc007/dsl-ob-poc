@@ -28,6 +28,7 @@ help:
 	@echo "Database targets:"
 	@echo "  make init-db            - Initialize the database (requires DB_CONN_STRING)"
 	@echo "  make migrate-schema     - Rename schema kyc-dsl -> dsl-ob-poc (requires DB_CONN_STRING)"
+	@echo "  make verify-db          - Verify schema/tables exist (uses DB or DB_CONN_STRING)"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  DB_CONN_STRING - PostgreSQL connection string (required for init-db)"
@@ -63,6 +64,20 @@ migrate-schema:
 	fi
 	psql "$$DB_CONN_STRING" -v ON_ERROR_STOP=1 -f sql/migrate_kyc-dsl_to_dsl-ob-poc.sql
 
+verify-db:
+	@# Use DB_CONN_STRING if set; else use DB; else default to postgres
+	@if [ -n "$$DB_CONN_STRING" ]; then \
+		PSQL_CONN="$$DB_CONN_STRING"; \
+	else \
+		DB_NAME="$${DB:-postgres}"; \
+		PSQL_CONN="postgres:///$${DB_NAME}?sslmode=disable"; \
+	fi; \
+	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c '\dn+ "dsl-ob-poc"' && \
+	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c '\dt+ "dsl-ob-poc".*' && \
+	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) AS products FROM "dsl-ob-poc".products;' && \
+	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) AS services FROM "dsl-ob-poc".services;' && \
+	psql "$$PSQL_CONN" -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) AS dsl_rows FROM "dsl-ob-poc".dsl_ob;'
+
 clean:
 	$(GO) clean
 	rm -f $(OUTPUT)
@@ -81,7 +96,7 @@ vet:
 lint:
 	@echo "Running golangci-lint..."
 	@if command -v $(GOLANGCI_LINT) >/dev/null 2>&1; then \
-		$(GOLANGCI_LINT) run ./...; \
+		GOCACHE=$(PWD)/.gocache $(GOLANGCI_LINT) run -v ./...; \
 	else \
 		echo "golangci-lint is not installed. Install it from https://golangci-lint.run/usage/install/"; \
 		exit 1; \
@@ -93,12 +108,12 @@ check: fmt vet lint
 # Test targets
 test:
 	@echo "Running tests..."
-	@$(GO) test -v ./...
+	@GOCACHE=$(PWD)/.gocache $(GO) test -v ./...
 
 test-coverage:
 	@echo "Running tests with coverage..."
-	@$(GO) test -v -coverprofile=coverage.out ./...
-	@$(GO) tool cover -html=coverage.out -o coverage.html
+	@GOCACHE=$(PWD)/.gocache $(GO) test -v -coverprofile=coverage.out ./...
+	@GOCACHE=$(PWD)/.gocache $(GO) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
 # Build and run targets

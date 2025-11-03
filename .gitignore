@@ -1,25 +1,37 @@
-# Go build artifacts
-dsl-poc
+############################
+# Go build artifacts & bins
+############################
+/dsl-poc
 *.exe
 *.dll
 *.so
 *.dylib
 *.test
 *.out
+*.pprof
+cpu.out
+mem.out
 
-# Coverage reports
-coverage.out
-coverage.html
+############################
+# Build output directories
+############################
+/bin/
+/build/
+/dist/
+/target/
+/coverage/
 
-# Local build/module caches
-.gocache/
-.gomodcache/
+############################
+# Local caches
+############################
+/.gocache/
+/.gomodcache/
+/.cache/
+/.golangci-lint.cache
 
-# Lint cache (if present)
-.golangci-lint.cache
-
-# macOS metadata
+############################
+# Logs & misc
+############################
+*.log
 .DS_Store
-
-# Archives
 *.zip

@@ -46,6 +46,16 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".services (
 
 CREATE INDEX IF NOT EXISTS idx_services_name ON "dsl-ob-poc".services (name);
 
+-- Join table: Products to Services
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
+    product_id UUID NOT NULL,
+    service_id UUID NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    PRIMARY KEY (product_id, service_id),
+    CONSTRAINT fk_ps_product FOREIGN KEY (product_id) REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ps_service FOREIGN KEY (service_id) REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE
+);
+
 -- Product Resources table: Resources required by products/services
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
     resource_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -54,7 +64,8 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
     owner VARCHAR(255) NOT NULL,
     dictionary_id UUID,
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    UNIQUE (name)
     -- Note: dictionary_id will reference dictionaries table via FK after that table is created
 );
 
@@ -74,10 +85,21 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionaries (
 
 CREATE INDEX IF NOT EXISTS idx_dictionaries_name ON "dsl-ob-poc".dictionaries (name);
 
+-- Join table: Dictionaries to Attributes
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionary_attributes (
+    dictionary_id UUID NOT NULL,
+    attribute_id UUID NOT NULL,
+    is_required BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    PRIMARY KEY (dictionary_id, attribute_id),
+    CONSTRAINT fk_da_dictionary FOREIGN KEY (dictionary_id) REFERENCES "dsl-ob-poc".dictionaries (dictionary_id) ON DELETE CASCADE,
+    CONSTRAINT fk_da_attribute FOREIGN KEY (attribute_id) REFERENCES "dsl-ob-poc".attributes (attribute_id) ON DELETE CASCADE
+);
+
 -- Attributes table: Detailed attribute definitions with metadata
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".attributes (
     attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL UNIQUE,
     detailed_description TEXT,
     is_private BOOLEAN DEFAULT FALSE,
     private_type VARCHAR(50),  -- 'derived' or 'given', only applicable if is_private = TRUE
@@ -107,3 +129,13 @@ FOREIGN KEY (dictionary_id) REFERENCES "dsl-ob-poc".dictionaries (dictionary_id)
 ALTER TABLE "dsl-ob-poc".dictionaries
 ADD CONSTRAINT fk_dictionaries_attribute
 FOREIGN KEY (attribute_id) REFERENCES "dsl-ob-poc".attributes (attribute_id) ON DELETE SET NULL;
+
+-- Join table: Services to Resources
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".service_resources (
+    service_id UUID NOT NULL,
+    resource_id UUID NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    PRIMARY KEY (service_id, resource_id),
+    CONSTRAINT fk_sr_service FOREIGN KEY (service_id) REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sr_resource FOREIGN KEY (resource_id) REFERENCES "dsl-ob-poc".prod_resources (resource_id) ON DELETE CASCADE
+);
