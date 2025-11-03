@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"dsl-ob-poc/internal/dictionary"
 	"dsl-ob-poc/internal/store"
 )
 
@@ -218,7 +219,7 @@ func TestAddDiscoveredResources(t *testing.T) {
 				},
 			},
 		},
-		ResourceAttributes: map[string][]store.Attribute{
+		ResourceAttributes: map[string][]dictionary.Attribute{
 			"CustodyAccount": {
 				{
 					AttributeID:     "a1",
@@ -266,7 +267,7 @@ func TestAddDiscoveredResourcesMultiple(t *testing.T) {
 				{ResourceID: "r2", Name: "AccountingRecord", Owner: "AcctTech", DictionaryGroup: "FundAccounting"},
 			},
 		},
-		ResourceAttributes: map[string][]store.Attribute{
+		ResourceAttributes: map[string][]dictionary.Attribute{
 			"CustodyAccount": {{AttributeID: "a1", Name: "custody.account_number", GroupID: "CustodyAccount"}},
 			"FundAccounting": {{AttributeID: "a2", Name: "accounting.nav_value", GroupID: "FundAccounting"}},
 		},

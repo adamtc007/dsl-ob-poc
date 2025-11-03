@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"dsl-ob-poc/internal/dictionary"
 	"dsl-ob-poc/internal/dsl"
 	"dsl-ob-poc/internal/store"
 )
@@ -40,7 +41,7 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
 
 	// 3. Discover all resources and attributes from the catalog
 	serviceResourceMap := make(map[string][]store.ProdResource)
-	dictionaryAttributeMap := make(map[string][]store.Attribute)
+	dictionaryAttributeMap := make(map[string][]dictionary.Attribute)
 
 	allResources := make(map[string]store.ProdResource)
 
@@ -64,11 +65,27 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
 			if resource.DictionaryGroup != "" {
 				// Only fetch if we haven't already
 				if _, ok := dictionaryAttributeMap[resource.DictionaryGroup]; !ok {
-					attributes, attrErr := s.GetAttributesForDictionaryGroup(ctx, resource.DictionaryGroup)
+					storeAttributes, attrErr := s.GetAttributesForDictionaryGroup(ctx, resource.DictionaryGroup)
 					if attrErr != nil {
 						return attrErr
 					}
-					dictionaryAttributeMap[resource.DictionaryGroup] = attributes
+					// Convert store.Attribute to dictionary.Attribute
+					dictAttributes := make([]dictionary.Attribute, len(storeAttributes))
+					for i, attr := range storeAttributes {
+						dictAttributes[i] = dictionary.Attribute{
+							AttributeID:     attr.AttributeID,
+							Name:            attr.Name,
+							LongDescription: attr.LongDescription,
+							GroupID:         attr.GroupID,
+							Mask:            attr.Mask,
+							Domain:          attr.Domain,
+							Vector:          attr.Vector,
+							// Note: Source and Sink are JSON strings in store.Attribute
+							// but SourceMetadata/SinkMetadata structs in dictionary.Attribute
+							// For now, we'll leave them as empty structs since this is POC
+						}
+					}
+					dictionaryAttributeMap[resource.DictionaryGroup] = dictAttributes
 				}
 			}
 		}

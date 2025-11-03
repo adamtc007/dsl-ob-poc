@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
 	"dsl-ob-poc/internal/agent"
 	"dsl-ob-poc/internal/dsl"
@@ -36,36 +37,58 @@ func RunDiscoverKYC(ctx context.Context, s *store.Store, ai *agent.Agent, args [
 		return err
 	}
 
-	// 2. Parse the DSL for the inputs needed by the agent.
+	// 2. Parse the DSL for the inputs needed by the agent
 	naturePurpose, err := dsl.ParseNaturePurpose(currentDSL)
 	if err != nil {
 		return fmt.Errorf("failed to parse nature-purpose from DSL: %w", err)
 	}
-
 	productNames, err := dsl.ParseProductNames(currentDSL)
 	if err != nil {
 		return fmt.Errorf("failed to parse products from DSL: %w", err)
 	}
 
+	// 3. Parse *existing* KYC requirements to perform a diff
+	// This makes the step idempotent and reconcilable.
+	existingReqs, err := dsl.ParseKYCRequirements(currentDSL)
+	if err != nil {
+		log.Printf("Note: No existing KYC block found, will create a new one.")
+		existingReqs = &dsl.KYCRequirements{} // Set to empty
+	} else {
+		log.Printf("Found %d existing documents and %d jurisdictions.", len(existingReqs.Documents), len(existingReqs.Jurisdictions))
+	}
+
 	log.Printf("Found Nature/Purpose: %q", naturePurpose)
 	log.Printf("Found Products: %v", productNames)
 
-	// 3. Call the AI Agent to determine the KYC requirements.
+	// 4. Call the AI Agent to determine the *new desired* KYC requirements
 	log.Println("Calling AI Agent (Gemini) to determine KYC requirements...")
-	kycReqs, err := ai.CallKYCAgent(ctx, naturePurpose, productNames)
+	newReqs, err := ai.CallKYCAgent(ctx, naturePurpose, productNames)
 	if err != nil {
 		return fmt.Errorf("ai agent failed: %w", err)
 	}
+	log.Printf("Agent response received. Desired docs: %v, Jurisdictions: %v", newReqs.Documents, newReqs.Jurisdictions)
 
-	log.Printf("Agent response received. Required docs: %v, Jurisdictions: %v", kycReqs.Documents, kycReqs.Jurisdictions)
-
-	// 4. Generate the new DSL with the agent's response.
-	newDSL, err := dsl.AddKYCRequirements(currentDSL, *kycReqs)
+	// 5. Calculate the "delta" and generate the new DSL
+	// This is the core reconciliation logic for KYC.
+	// We pass both the old and new requirements to the DSL generator.
+	newDSL, diff, err := dsl.AddOrModifyKYCBlock(currentDSL, *existingReqs, *newReqs)
 	if err != nil {
 		return fmt.Errorf("failed to generate new DSL: %w", err)
 	}
 
-	// 5. Save the new DSL version (v3).
+	if !diff.HasChanges() {
+		log.Println("✅ KYC requirements are already up-to-date. No changes needed.")
+		fmt.Println("KYC requirements are already up-to-date.")
+		return nil
+	}
+
+	log.Printf("KYC Diff: +Docs[%s] -Docs[%s] +Juris[%s] -Juris[%s]",
+		strings.Join(diff.AddedDocs, ","),
+		strings.Join(diff.RemovedDocs, ","),
+		strings.Join(diff.AddedJuris, ","),
+		strings.Join(diff.RemovedJuris, ","))
+
+	// 6. Save the new DSL version (v3).
 	versionID, err := s.InsertDSL(ctx, *cbuID, newDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save new DSL version: %w", err)
