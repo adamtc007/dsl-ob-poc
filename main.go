@@ -189,6 +189,10 @@ func run() int {
 	case "export-mock-data":
 		err = cli.RunExportMockData(ctx, dataStore, args)
 
+	// DSL S-EXPRESSION EXECUTION
+	case "dsl-execute":
+		err = cli.RunDSLExecute(ctx, dataStore, args)
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
@@ -246,4 +250,10 @@ func printUsage() {
 	fmt.Println("\nUtility Commands:")
 	fmt.Println("  history --cbu=<cbu-id>       Views the full, versioned DSL evolution for a case.")
 	fmt.Println("  export-mock-data [--dir=<path>] Exports existing database records to JSON mock files")
+	fmt.Println("\nDSL Execution Engine:")
+	fmt.Println("  dsl-execute [--cbu=<cbu-id>] [--demo] [--file=<path>] [dsl-command]")
+	fmt.Println("              Execute S-expression DSL commands with UUID attribute handling")
+	fmt.Println("              --demo: Run comprehensive demo workflow")
+	fmt.Println("              --file: Execute commands from file")
+	fmt.Println("              Interactive mode if no command specified")
 }

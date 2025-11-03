@@ -55,6 +55,60 @@ type VerbDefinition struct {
 }
 ```
 
+## Bring-Up Kit (Pre-Implementation Validation)
+
+### 🔧 IR Validator CLI
+**File**: `cmd/ir-validate/main.go`
+- Standalone CLI tool for validating IR plans
+- Reads from stdin or file (`-in examples/ir/sub_issue.json`)
+- Build: `go build -o bin/ir-validate ./cmd/ir-validate`
+- Test: `./bin/ir-validate -in examples/ir/sub_issue.json`
+
+### 🔑 Idempotency Helper
+**File**: `internal/ir/idempotency.go`
+- `DefaultIdempotencyKey(s Step)` - deterministic SHA-256 over {op,args}
+- `ApplyIdempotency()` - fills key if nil, for retry safety
+- Normalizes nested maps for consistent hashing
+
+### 🧪 Validation Tests
+**File**: `internal/ir/validate_test.go`
+- `TestPlanOK()` - validates good IR plans
+- `TestPlanBadUUID()` - tests error conditions
+- `TestIdempotencyKeyGeneration()` - deterministic key testing
+- Run: `go test ./internal/ir -v`
+
+### 📊 Minimal Database Seed
+**File**: `db/seed/seed_minimal.sql`
+- Sample fund, share class, investor, register lot
+- Quick smoke test data for register views
+- Load: `psql "$DATABASE_URL" -f db/seed/seed_minimal.sql`
+- Test: `SELECT * FROM register_of_investors_v;`
+
+### 📋 Example IR Files
+**File**: `examples/ir/sub_issue.json`
+- 3-step workflow: opportunity → subscribe → issue
+- Uses seed data UUIDs for consistency
+- Validates against full IR schema
+
+### 🗄️ Database Commands
+```bash
+# Up migration
+goose -dir db/migrations postgres "$DATABASE_URL" up
+
+# Seed minimal data
+psql "$DATABASE_URL" -f db/seed/seed_minimal.sql
+
+# Down migration (rollback)
+goose -dir db/migrations postgres "$DATABASE_URL" down
+```
+
+### ⚠️ Common Gotchas
+- **encoding/json**: Stick with stdlib, avoid json/v2
+- **Decimals**: float64 for validation, decimal lib for booking
+- **Dates**: YYYY-MM-DD format, keep UTC server-side
+- **TRGM**: pg_trgm extension must exist before GIN index
+- **Idempotency**: Apply `Step.ApplyIdempotency()` before persisting
+
 ## Implementation Todo (Staged Approach)
 
 ### 🟡 Stage 1: Core Infrastructure (Week 1-2)
