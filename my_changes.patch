@@ -1,0 +1,640 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 959369a..14ed675 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -40,6 +40,8 @@ make init-db            # Initialize schema and tables
+ ./dsl-poc create --cbu="CBU-1234"
+ ./dsl-poc add-products --cbu="CBU-1234" --products="CUSTODY,FUND_ACCOUNTING"
+ ./dsl-poc discover-kyc --cbu="CBU-1234"  # Requires GEMINI_API_KEY
++./dsl-poc discover-services --cbu="CBU-1234"  # Service discovery and planning
++./dsl-poc discover-resources --cbu="CBU-1234"  # Resource discovery and planning
+ ./dsl-poc history --cbu="CBU-1234"       # View complete DSL evolution
+ ```
+ 
+@@ -93,6 +95,8 @@ S-expressions with nested structure representing onboarding progression:
+ - DSL generation and parsing tested with realistic scenarios
+ - CLI command logic tested with various input combinations
+ - Run single test: `go test -v ./internal/cli -run TestHistoryCommand`
++- Run all tests: `make test`
++- Generate coverage report: `make test-coverage`
+ 
+ ## Performance Notes
+ 
+@@ -100,6 +104,16 @@ S-expressions with nested structure representing onboarding progression:
+ 
+ **Database Optimizations**: Composite indexes on `(cbu_id, created_at DESC)` for fast latest lookups, soft deletes preserve data integrity, foreign key constraints with appropriate cascades.
+ 
++## Code Quality
++
++**Linting and Formatting**:
++```bash
++make lint               # Run golangci-lint with 20+ linters
++make fmt                # Format code with gofmt
++make vet                # Run go vet
++make check              # Run fmt, vet, and lint (pre-commit check)
++```
++
+ ## CI/CD
+ 
+ GitHub Actions pipeline runs on Ubuntu with Go version from `go.mod`, caches modules and build artifacts, executes lint/build/test phases with 5-minute timeout.
+\ No newline at end of file
+diff --git a/internal/cli/discover_resources.go b/internal/cli/discover_resources.go
+index d56a455..3be9930 100644
+--- a/internal/cli/discover_resources.go
++++ b/internal/cli/discover_resources.go
+@@ -60,15 +60,15 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
+ 			// Add to unique map
+ 			allResources[resource.ResourceID] = resource
+ 
+-			// If resource has a dictionary, get its attributes
+-			if resource.DictionaryID != "" {
++			// If resource has a dictionary group, get its attributes
++			if resource.DictionaryGroup != "" {
+ 				// Only fetch if we haven't already
+-				if _, ok := dictionaryAttributeMap[resource.DictionaryID]; !ok {
+-					attributes, attrErr := s.GetAttributesForDictionary(ctx, resource.DictionaryID)
++				if _, ok := dictionaryAttributeMap[resource.DictionaryGroup]; !ok {
++					attributes, attrErr := s.GetAttributesForDictionaryGroup(ctx, resource.DictionaryGroup)
+ 					if attrErr != nil {
+ 						return attrErr
+ 					}
+-					dictionaryAttributeMap[resource.DictionaryID] = attributes
++					dictionaryAttributeMap[resource.DictionaryGroup] = attributes
+ 				}
+ 			}
+ 		}
+diff --git a/internal/dsl/dsl.go b/internal/dsl/dsl.go
+index f8f737d..533e7b9 100644
+--- a/internal/dsl/dsl.go
++++ b/internal/dsl/dsl.go
+@@ -199,9 +199,9 @@ func AddDiscoveredResources(currentDSL string, plan ResourceDiscoveryPlan) (stri
+ 		b.WriteString(fmt.Sprintf("  (resource.create %q\n", resource.Name))
+ 		b.WriteString(fmt.Sprintf("    (owner %q)\n", resource.Owner))
+ 
+-		attributes := plan.ResourceAttributes[resource.DictionaryID]
+-		for _, attr := range attributes {
+-			b.WriteString(fmt.Sprintf("    (attr.%q)\n", attr.Name))
++		attributes := plan.ResourceAttributes[resource.DictionaryGroup]
++		for i := range attributes {
++			b.WriteString(fmt.Sprintf("    (attr.%q)\n", attributes[i].Name))
+ 		}
+ 		b.WriteString("  )\n")
+ 	}
+diff --git a/internal/dsl/dsl_test.go b/internal/dsl/dsl_test.go
+index 0224b52..b32b96f 100644
+--- a/internal/dsl/dsl_test.go
++++ b/internal/dsl/dsl_test.go
+@@ -211,20 +211,22 @@ func TestAddDiscoveredResources(t *testing.T) {
+ 		ServiceResources: map[string][]store.ProdResource{
+ 			"CustodyService": {
+ 				{
+-					ResourceID:   "r1",
+-					Name:         "CustodyAccount",
+-					Owner:        "CustodyTech",
+-					DictionaryID: "d1",
++					ResourceID:      "r1",
++					Name:            "CustodyAccount",
++					Owner:           "CustodyTech",
++					DictionaryGroup: "CustodyAccount",
+ 				},
+ 			},
+ 		},
+ 		ResourceAttributes: map[string][]store.Attribute{
+-			"d1": {
++			"CustodyAccount": {
+ 				{
+-					AttributeID: "a1",
+-					Name:        "account_number",
+-					DataType:    "string",
+-					IsPrivate:   false,
++					AttributeID:     "a1",
++					Name:            "custody.account_number",
++					LongDescription: "Custody account identifier",
++					GroupID:         "CustodyAccount",
++					Mask:            "string",
++					Domain:          "Custody",
+ 				},
+ 			},
+ 		},
+@@ -247,7 +249,7 @@ func TestAddDiscoveredResources(t *testing.T) {
+ 		t.Errorf("Expected DSL to contain owner, got: %s", result)
+ 	}
+ 
+-	if !strings.Contains(result, "(attr.\"account_number\")") {
++	if !strings.Contains(result, "(attr.\"custody.account_number\")") {
+ 		t.Errorf("Expected DSL to contain attribute, got: %s", result)
+ 	}
+ }
+@@ -258,15 +260,15 @@ func TestAddDiscoveredResourcesMultiple(t *testing.T) {
+ 	plan := ResourceDiscoveryPlan{
+ 		ServiceResources: map[string][]store.ProdResource{
+ 			"CustodyService": {
+-				{ResourceID: "r1", Name: "CustodyAccount", Owner: "CustodyTech", DictionaryID: "d1"},
++				{ResourceID: "r1", Name: "CustodyAccount", Owner: "CustodyTech", DictionaryGroup: "CustodyAccount"},
+ 			},
+ 			"AccountingService": {
+-				{ResourceID: "r2", Name: "AccountingRecord", Owner: "AcctTech", DictionaryID: "d2"},
++				{ResourceID: "r2", Name: "AccountingRecord", Owner: "AcctTech", DictionaryGroup: "FundAccounting"},
+ 			},
+ 		},
+ 		ResourceAttributes: map[string][]store.Attribute{
+-			"d1": {{AttributeID: "a1", Name: "account_number"}},
+-			"d2": {{AttributeID: "a2", Name: "nav_value"}},
++			"CustodyAccount": {{AttributeID: "a1", Name: "custody.account_number", GroupID: "CustodyAccount"}},
++			"FundAccounting": {{AttributeID: "a2", Name: "accounting.nav_value", GroupID: "FundAccounting"}},
+ 		},
+ 	}
+ 
+diff --git a/internal/store/store.go b/internal/store/store.go
+index 42672a6..4dae241 100644
+--- a/internal/store/store.go
++++ b/internal/store/store.go
+@@ -32,32 +32,24 @@ type Service struct {
+ 
+ // ProdResource represents a resource required by products/services.
+ type ProdResource struct {
+-	ResourceID   string
+-	Name         string
+-	Description  string
+-	Owner        string
+-	DictionaryID string
++	ResourceID      string
++	Name            string
++	Description     string
++	Owner           string
++	DictionaryGroup string
+ }
+ 
+-// Attribute represents an attribute in a dictionary.
++// Attribute represents an attribute in the dictionary (v3 schema).
+ type Attribute struct {
+-	AttributeID         string
+-	Name                string
+-	DetailedDescription string
+-	IsPrivate           bool
+-	PrivateType         *string
+-	DataType            string
+-	PrimarySinkURL      string
+-	PrimarySourceURL    *string
+-	SecondarySourceURL  *string
+-	TertiarySourceURL   *string
+-}
+-
+-// Dictionary represents a data dictionary.
+-type Dictionary struct {
+-	DictionaryID string
+-	Name         string
+-	Description  string
++	AttributeID     string
++	Name            string
++	LongDescription string
++	GroupID         string
++	Mask            string
++	Domain          string
++	Vector          string
++	Source          string // JSON string
++	Sink            string // JSON string
+ }
+ 
+ // NewStore creates a new Store instance and opens a database connection.
+@@ -190,108 +182,101 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
+ 		}
+ 	}
+ 
+-	// Insert Attributes
++	// Insert Dictionary Attributes (v3 schema)
+ 	attributes := []struct {
+-		name             string
+-		description      string
+-		isPrivate        bool
+-		privateType      *string
+-		dataType         string
+-		primarySinkURL   string
+-		primarySourceURL *string
++		name            string
++		longDescription string
++		groupID         string
++		mask            string
++		domain          string
++		sourceJSON      string
++		sinkJSON        string
+ 	}{
+-		{"account_number", "Custody account identifier", false, nil, "string", "https://custody.example.com/accounts", nil},
+-		{"domicile", "Fund domicile jurisdiction", false, nil, "string", "https://registry.example.com/domicile", nil},
+-		{"isin", "International Securities Identification Number", false, nil, "string", "https://registry.example.com/isin", nil},
+-		{"nav_value", "Net Asset Value", true, strPtr("derived"), "string", "https://accounting.example.com/nav", nil},
++		{
++			"entity.legal_name",
++			"Legal name of the entity for KYC purposes",
++			"KYC",
++			"string",
++			"KYC",
++			`{"type": "manual", "url": "https://kyc.example.com/entity", "required": true}`,
++			`{"type": "database", "url": "postgres://kyc_db/entities", "table": "legal_entities", "field": "legal_name"}`,
++		},
++		{
++			"custody.account_number",
++			"Custody account identifier for asset safekeeping",
++			"CustodyAccount",
++			"string",
++			"Custody",
++			`{"type": "api", "url": "https://custody.example.com/accounts", "method": "GET"}`,
++			`{"type": "database", "url": "postgres://custody_db/accounts", "table": "accounts", "field": "account_number"}`,
++		},
++		{
++			"entity.domicile",
++			"Domicile jurisdiction of the fund or entity",
++			"KYC",
++			"string",
++			"KYC",
++			`{"type": "registry", "url": "https://registry.example.com/jurisdictions", "validated": true}`,
++			`{"type": "database", "url": "postgres://kyc_db/entities", "table": "entities", "field": "domicile"}`,
++		},
++		{
++			"security.isin",
++			"International Securities Identification Number",
++			"Security",
++			"string",
++			"Trading",
++			`{"type": "api", "url": "https://isin-registry.example.com/lookup", "authoritative": true}`,
++			`{"type": "database", "url": "postgres://trading_db/securities", "table": "securities", "field": "isin"}`,
++		},
++		{
++			"accounting.nav_value",
++			"Net Asset Value calculated daily",
++			"FundAccounting",
++			"string",
++			"Accounting",
++			`{"type": "calculated", "formula": "total_assets - total_liabilities", "frequency": "daily"}`,
++			`{"type": "database", "url": "postgres://accounting_db/nav", "table": "daily_nav", "field": "nav_value"}`,
++		},
+ 	}
+ 
+-	attributeIDs := make(map[string]string)
+ 	for _, attr := range attributes {
+-		var attributeID string
+-		queryErr := tx.QueryRowContext(ctx,
+-			`INSERT INTO "dsl-ob-poc".attributes (name, detailed_description, is_private, private_type, data_type, primary_sink_url, primary_source_url)
+-			 VALUES ($1, $2, $3, $4, $5, $6, $7)
+-			 ON CONFLICT (name) DO UPDATE SET detailed_description = EXCLUDED.detailed_description
+-			 RETURNING attribute_id`,
+-			attr.name, attr.description, attr.isPrivate, attr.privateType, attr.dataType, attr.primarySinkURL, attr.primarySourceURL).Scan(&attributeID)
+-		if queryErr != nil {
+-			return fmt.Errorf("failed to insert attribute %s: %w", attr.name, queryErr)
+-		}
+-		attributeIDs[attr.name] = attributeID
+-	}
+-
+-	// Insert Dictionaries
+-	dictionaries := []struct {
+-		name        string
+-		description string
+-	}{
+-		{"Custody Account Schema", "Schema for custody account resources"},
+-		{"Fund Accounting Schema", "Schema for fund accounting resources"},
+-		{"Transfer Agency Schema", "Schema for transfer agency resources"},
+-	}
+-
+-	dictionaryIDs := make(map[string]string)
+-	for _, dict := range dictionaries {
+-		var dictionaryID string
+-		queryErr := tx.QueryRowContext(ctx,
+-			`INSERT INTO "dsl-ob-poc".dictionaries (name, description)
+-			 VALUES ($1, $2)
+-			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
+-			 RETURNING dictionary_id`,
+-			dict.name, dict.description).Scan(&dictionaryID)
+-		if queryErr != nil {
+-			return fmt.Errorf("failed to insert dictionary %s: %w", dict.name, queryErr)
+-		}
+-		dictionaryIDs[dict.name] = dictionaryID
+-	}
+-
+-	// Link Dictionaries to Attributes
+-	dictionaryAttributeLinks := []struct {
+-		dictionary string
+-		attribute  string
+-		required   bool
+-	}{
+-		{"Custody Account Schema", "account_number", true},
+-		{"Custody Account Schema", "domicile", true},
+-		{"Fund Accounting Schema", "nav_value", true},
+-		{"Fund Accounting Schema", "isin", true},
+-		{"Transfer Agency Schema", "isin", true},
+-		{"Transfer Agency Schema", "domicile", false},
+-	}
+-
+-	for _, link := range dictionaryAttributeLinks {
+ 		_, execErr := tx.ExecContext(ctx,
+-			`INSERT INTO "dsl-ob-poc".dictionary_attributes (dictionary_id, attribute_id, is_required)
+-			 VALUES ($1, $2, $3)
+-			 ON CONFLICT DO NOTHING`,
+-			dictionaryIDs[link.dictionary], attributeIDs[link.attribute], link.required)
++			`INSERT INTO "dsl-ob-poc".dictionary (name, long_description, group_id, mask, domain, source, sink)
++			 VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
++			 ON CONFLICT (name) DO UPDATE SET
++				long_description = EXCLUDED.long_description,
++				group_id = EXCLUDED.group_id,
++				mask = EXCLUDED.mask,
++				domain = EXCLUDED.domain,
++				source = EXCLUDED.source,
++				sink = EXCLUDED.sink`,
++			attr.name, attr.longDescription, attr.groupID, attr.mask, attr.domain, attr.sourceJSON, attr.sinkJSON)
+ 		if execErr != nil {
+-			return fmt.Errorf("failed to link dictionary %s to attribute %s: %w", link.dictionary, link.attribute, execErr)
++			return fmt.Errorf("failed to insert dictionary attribute %s: %w", attr.name, execErr)
+ 		}
+ 	}
+ 
+ 	// Insert Resources
+ 	resources := []struct {
+-		name         string
+-		description  string
+-		owner        string
+-		dictionaryID string
++		name            string
++		description     string
++		owner           string
++		dictionaryGroup string
+ 	}{
+-		{"CustodyAccount", "Custody account resource", "CustodyTech", dictionaryIDs["Custody Account Schema"]},
+-		{"FundAccountingRecord", "Fund accounting record resource", "AccountingEng", dictionaryIDs["Fund Accounting Schema"]},
+-		{"ShareholderRegistry", "Shareholder registry resource", "TransferAgencyTeam", dictionaryIDs["Transfer Agency Schema"]},
++		{"CustodyAccount", "Custody account resource", "CustodyTech", "CustodyAccount"},
++		{"FundAccountingRecord", "Fund accounting record resource", "AccountingEng", "FundAccounting"},
++		{"ShareholderRegistry", "Shareholder registry resource", "TransferAgencyTeam", "KYC"},
+ 	}
+ 
+ 	resourceIDs := make(map[string]string)
+ 	for _, res := range resources {
+ 		var resourceID string
+ 		queryErr := tx.QueryRowContext(ctx,
+-			`INSERT INTO "dsl-ob-poc".prod_resources (name, description, owner, dictionary_id)
++			`INSERT INTO "dsl-ob-poc".prod_resources (name, description, owner, dictionary_group)
+ 			 VALUES ($1, $2, $3, $4)
+ 			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
+ 			 RETURNING resource_id`,
+-			res.name, res.description, res.owner, res.dictionaryID).Scan(&resourceID)
++			res.name, res.description, res.owner, res.dictionaryGroup).Scan(&resourceID)
+ 		if queryErr != nil {
+ 			return fmt.Errorf("failed to insert resource %s: %w", res.name, queryErr)
+ 		}
+@@ -462,7 +447,7 @@ func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([
+ 	var resources []ProdResource
+ 	for rows.Next() {
+ 		var res ProdResource
+-		if scanErr := rows.Scan(&res.ResourceID, &res.Name, &res.Description, &res.Owner, &res.DictionaryID); scanErr != nil {
++		if scanErr := rows.Scan(&res.ResourceID, &res.Name, &res.Description, &res.Owner, &res.DictionaryGroup); scanErr != nil {
+ 			return nil, fmt.Errorf("failed to scan resource: %w", scanErr)
+ 		}
+ 		resources = append(resources, res)
+@@ -475,27 +460,26 @@ func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([
+ 	return resources, nil
+ }
+ 
+-// GetAttributesForDictionary retrieves all attributes for a given dictionary.
+-func (s *Store) GetAttributesForDictionary(ctx context.Context, dictionaryID string) ([]Attribute, error) {
++// GetAttributesForDictionaryGroup retrieves all attributes for a given dictionary group.
++func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]Attribute, error) {
+ 	rows, err := s.db.QueryContext(ctx,
+-		`SELECT a.attribute_id, a.name, COALESCE(a.detailed_description, ''),
+-                a.is_private, a.private_type, a.data_type, a.primary_sink_url,
+-                a.primary_source_url, a.secondary_source_url, a.tertiary_source_url
+-         FROM "dsl-ob-poc".attributes a
+-         JOIN "dsl-ob-poc".dictionary_attributes da ON a.attribute_id = da.attribute_id
+-		 WHERE da.dictionary_id = $1`,
+-		dictionaryID)
++		`SELECT attribute_id, name, COALESCE(long_description, ''), group_id,
++                COALESCE(mask, 'string'), COALESCE(domain, ''), COALESCE(vector, ''),
++                COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
++         FROM "dsl-ob-poc".dictionary
++         WHERE group_id = $1`,
++		groupID)
+ 	if err != nil {
+-		return nil, fmt.Errorf("failed to query attributes: %w", err)
++		return nil, fmt.Errorf("failed to query dictionary attributes: %w", err)
+ 	}
+ 	defer rows.Close()
+ 
+ 	var attributes []Attribute
+ 	for rows.Next() {
+ 		var attr Attribute
+-		if scanErr := rows.Scan(&attr.AttributeID, &attr.Name, &attr.DetailedDescription,
+-			&attr.IsPrivate, &attr.PrivateType, &attr.DataType, &attr.PrimarySinkURL,
+-			&attr.PrimarySourceURL, &attr.SecondarySourceURL, &attr.TertiarySourceURL); scanErr != nil {
++		if scanErr := rows.Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription,
++			&attr.GroupID, &attr.Mask, &attr.Domain, &attr.Vector,
++			&attr.Source, &attr.Sink); scanErr != nil {
+ 			return nil, fmt.Errorf("failed to scan attribute: %w", scanErr)
+ 		}
+ 		attributes = append(attributes, attr)
+@@ -507,8 +491,3 @@ func (s *Store) GetAttributesForDictionary(ctx context.Context, dictionaryID str
+ 
+ 	return attributes, nil
+ }
+-
+-// Helper function to create string pointers
+-func strPtr(s string) *string {
+-	return &s
+-}
+diff --git a/sql/init.sql b/sql/init.sql
+index 1987d01..c343a2e 100644
+--- a/sql/init.sql
++++ b/sql/init.sql
+@@ -1,29 +1,24 @@
+--- Creates the schema and tables for the DSL POC
++/*
++v3: Refactors the attributes table to be the central dictionary.
++- Uses JSONB to store rich, complex metadata for sources and sinks.
++- Renames to 'dictionary' as it's the master table.
++- Removes the old 'dictionaries' and 'dictionary_attributes' tables,
++  as an attribute's 'dictionary_id' (now 'group_id') is just a string for grouping.
++- **Sets main schema to "dsl-ob-poc"**
++*/
+ CREATE SCHEMA IF NOT EXISTS "dsl-ob-poc";
+ 
+ -- Table to store immutable, versioned DSL files
+ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
+-    -- Use a UUID for the version ID
+     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-
+-    -- The CBU this DSL version belongs to
+     cbu_id VARCHAR(255) NOT NULL,
+-
+-    -- The full S-expression DSL text
+     dsl_text TEXT NOT NULL,
+-
+-    -- Timestamp for ordering
+     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+ );
+ 
+--- Index for fast lookups of the latest DSL for a CBU
+ CREATE INDEX IF NOT EXISTS idx_dsl_ob_cbu_id_created_at
+ ON "dsl-ob-poc".dsl_ob (cbu_id, created_at DESC);
+ 
+--- ============================================================================
+--- NEW TABLES FOR PRODUCT CATALOG, SERVICES, RESOURCES, AND METADATA
+--- ============================================================================
+-
+ -- Products table: Core product definitions
+ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
+     product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+@@ -32,7 +27,6 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
+     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+ );
+-
+ CREATE INDEX IF NOT EXISTS idx_products_name ON "dsl-ob-poc".products (name);
+ 
+ -- Services table: Services that can be offered with or without products
+@@ -43,99 +37,75 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".services (
+     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+ );
+-
+ CREATE INDEX IF NOT EXISTS idx_services_name ON "dsl-ob-poc".services (name);
+ 
+--- Join table: Products to Services
++-- Product <-> Service Join Table
+ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
+-    product_id UUID NOT NULL,
+-    service_id UUID NOT NULL,
+-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+-    PRIMARY KEY (product_id, service_id),
+-    CONSTRAINT fk_ps_product FOREIGN KEY (product_id) REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+-    CONSTRAINT fk_ps_service FOREIGN KEY (service_id) REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE
++    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
++    service_id UUID NOT NULL REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
++    PRIMARY KEY (product_id, service_id)
+ );
+ 
+--- Product Resources table: Resources required by products/services
+-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
+-    resource_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-    name VARCHAR(255) NOT NULL,
+-    description TEXT,
+-    owner VARCHAR(255) NOT NULL,
+-    dictionary_id UUID,
+-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+-    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+-    UNIQUE (name)
+-    -- Note: dictionary_id will reference dictionaries table via FK after that table is created
+-);
+-
+-CREATE INDEX IF NOT EXISTS idx_prod_resources_name ON "dsl-ob-poc".prod_resources (name);
+-CREATE INDEX IF NOT EXISTS idx_prod_resources_owner ON "dsl-ob-poc".prod_resources (owner);
++-- ============================================================================
++-- DICTIONARY AND RESOURCE TABLES (REFACTORED)
++-- ============================================================================
+ 
+--- Dictionaries table: Master data dictionaries that contain attributes
+-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionaries (
+-    dictionary_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
++-- Master Data Dictionary (Attributes table)
++-- This is the central pillar.
++CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionary (
++    attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
++    -- The unique "variable name" for the DSL, e.g., "entity.legal_name"
+     name VARCHAR(255) NOT NULL UNIQUE,
+-    description TEXT,
+-    attribute_id UUID,
++
++    -- Description for AI agent discovery and human readability
++    long_description TEXT,
++
++    -- The "dictionary" this attribute belongs to (e.g., "KYC", "Settlement")
++    -- This replaces the old 'dictionaries' table.
++    group_id VARCHAR(100) NOT NULL DEFAULT 'default',
++
++    -- Metadata
++    mask VARCHAR(50) DEFAULT 'string', -- 'string', 'ssn', 'date'
++    domain VARCHAR(100), -- 'KYC', 'AML', 'Trading', 'Settlement'
++    vector TEXT,         -- For AI semantic search
++
++    -- Rich metadata stored as JSON
++    source JSONB,        -- See SourceMetadata struct in Go
++    sink JSONB,          -- See SinkMetadata struct in Go
++
+     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+-    -- Note: attribute_id will reference attributes table via FK after that table is created
+ );
+ 
+-CREATE INDEX IF NOT EXISTS idx_dictionaries_name ON "dsl-ob-poc".dictionaries (name);
++CREATE INDEX IF NOT EXISTS idx_dictionary_name ON "dsl-ob-poc".dictionary (name);
++CREATE INDEX IF NOT EXISTS idx_dictionary_group_id ON "dsl-ob-poc".dictionary (group_id);
++CREATE INDEX IF NOT EXISTS idx_dictionary_domain ON "dsl-ob-poc".dictionary (domain);
+ 
+--- Join table: Dictionaries to Attributes
+-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionary_attributes (
+-    dictionary_id UUID NOT NULL,
+-    attribute_id UUID NOT NULL,
+-    is_required BOOLEAN DEFAULT FALSE,
+-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+-    PRIMARY KEY (dictionary_id, attribute_id),
+-    CONSTRAINT fk_da_dictionary FOREIGN KEY (dictionary_id) REFERENCES "dsl-ob-poc".dictionaries (dictionary_id) ON DELETE CASCADE,
+-    CONSTRAINT fk_da_attribute FOREIGN KEY (attribute_id) REFERENCES "dsl-ob-poc".attributes (attribute_id) ON DELETE CASCADE
+-);
+ 
+--- Attributes table: Detailed attribute definitions with metadata
+-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".attributes (
+-    attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
++-- Production Resources table
++CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
++    resource_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     name VARCHAR(255) NOT NULL UNIQUE,
+-    detailed_description TEXT,
+-    is_private BOOLEAN DEFAULT FALSE,
+-    private_type VARCHAR(50),  -- 'derived' or 'given', only applicable if is_private = TRUE
+-    primary_source_url TEXT,
+-    secondary_source_url TEXT,
+-    tertiary_source_url TEXT,
+-    data_type VARCHAR(50) DEFAULT 'string',  -- 'string', 'mask', 'struct', etc.
+-    primary_sink_url TEXT NOT NULL,  -- Where the attribute is persisted
++    description TEXT,
++    owner VARCHAR(255) NOT NULL,
++
++    -- A resource is now defined by its "dictionary_group"
++    -- This replaces the foreign key to the old 'dictionaries' table.
++    -- e.g., "CustodyAccount" resource uses the "CustodyAccount" group_id.
++    dictionary_group VARCHAR(100),
++
+     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+-    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+-    CONSTRAINT chk_private_type CHECK (
+-        (is_private = FALSE AND private_type IS NULL) OR
+-        (is_private = TRUE AND private_type IN ('derived', 'given'))
+-    ),
+-    CONSTRAINT chk_data_type CHECK (data_type IN ('string', 'mask', 'struct'))
++    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+ );
+ 
+-CREATE INDEX IF NOT EXISTS idx_attributes_name ON "dsl-ob-poc".attributes (name);
+-CREATE INDEX IF NOT EXISTS idx_attributes_is_private ON "dsl-ob-poc".attributes (is_private);
+-CREATE INDEX IF NOT EXISTS idx_attributes_private_type ON "dsl-ob-poc".attributes (private_type);
+-
+--- Add foreign key constraints now that all tables exist
+-ALTER TABLE "dsl-ob-poc".prod_resources
+-ADD CONSTRAINT fk_prod_resources_dictionary
+-FOREIGN KEY (dictionary_id) REFERENCES "dsl-ob-poc".dictionaries (dictionary_id) ON DELETE SET NULL;
++CREATE INDEX IF NOT EXISTS idx_prod_resources_name ON "dsl-ob-poc".prod_resources (name);
++CREATE INDEX IF NOT EXISTS idx_prod_resources_owner ON "dsl-ob-poc".prod_resources (owner);
++CREATE INDEX IF NOT EXISTS idx_prod_resources_dict_group ON "dsl-ob-poc".prod_resources (dictionary_group);
+ 
+-ALTER TABLE "dsl-ob-poc".dictionaries
+-ADD CONSTRAINT fk_dictionaries_attribute
+-FOREIGN KEY (attribute_id) REFERENCES "dsl-ob-poc".attributes (attribute_id) ON DELETE SET NULL;
+ 
+--- Join table: Services to Resources
++-- Service <-> Resource Join Table
+ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".service_resources (
+-    service_id UUID NOT NULL,
+-    resource_id UUID NOT NULL,
+-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+-    PRIMARY KEY (service_id, resource_id),
+-    CONSTRAINT fk_sr_service FOREIGN KEY (service_id) REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
+-    CONSTRAINT fk_sr_resource FOREIGN KEY (resource_id) REFERENCES "dsl-ob-poc".prod_resources (resource_id) ON DELETE CASCADE
++    service_id UUID NOT NULL REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
++    resource_id UUID NOT NULL REFERENCES "dsl-ob-poc".prod_resources (resource_id) ON DELETE CASCADE,
++    PRIMARY KEY (service_id, resource_id)
+ );

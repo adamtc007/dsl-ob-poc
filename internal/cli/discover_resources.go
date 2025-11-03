@@ -60,15 +60,15 @@ func RunDiscoverResources(ctx context.Context, s *store.Store, args []string) er
 			// Add to unique map
 			allResources[resource.ResourceID] = resource
 
-			// If resource has a dictionary, get its attributes
-			if resource.DictionaryID != "" {
+			// If resource has a dictionary group, get its attributes
+			if resource.DictionaryGroup != "" {
 				// Only fetch if we haven't already
-				if _, ok := dictionaryAttributeMap[resource.DictionaryID]; !ok {
-					attributes, attrErr := s.GetAttributesForDictionary(ctx, resource.DictionaryID)
+				if _, ok := dictionaryAttributeMap[resource.DictionaryGroup]; !ok {
+					attributes, attrErr := s.GetAttributesForDictionaryGroup(ctx, resource.DictionaryGroup)
 					if attrErr != nil {
 						return attrErr
 					}
-					dictionaryAttributeMap[resource.DictionaryID] = attributes
+					dictionaryAttributeMap[resource.DictionaryGroup] = attributes
 				}
 			}
 		}

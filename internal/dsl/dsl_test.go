@@ -211,20 +211,22 @@ func TestAddDiscoveredResources(t *testing.T) {
 		ServiceResources: map[string][]store.ProdResource{
 			"CustodyService": {
 				{
-					ResourceID:   "r1",
-					Name:         "CustodyAccount",
-					Owner:        "CustodyTech",
-					DictionaryID: "d1",
+					ResourceID:      "r1",
+					Name:            "CustodyAccount",
+					Owner:           "CustodyTech",
+					DictionaryGroup: "CustodyAccount",
 				},
 			},
 		},
 		ResourceAttributes: map[string][]store.Attribute{
-			"d1": {
+			"CustodyAccount": {
 				{
-					AttributeID: "a1",
-					Name:        "account_number",
-					DataType:    "string",
-					IsPrivate:   false,
+					AttributeID:     "a1",
+					Name:            "custody.account_number",
+					LongDescription: "Custody account identifier",
+					GroupID:         "CustodyAccount",
+					Mask:            "string",
+					Domain:          "Custody",
 				},
 			},
 		},
@@ -247,7 +249,7 @@ func TestAddDiscoveredResources(t *testing.T) {
 		t.Errorf("Expected DSL to contain owner, got: %s", result)
 	}
 
-	if !strings.Contains(result, "(attr.\"account_number\")") {
+	if !strings.Contains(result, "(attr.\"custody.account_number\")") {
 		t.Errorf("Expected DSL to contain attribute, got: %s", result)
 	}
 }
@@ -258,15 +260,15 @@ func TestAddDiscoveredResourcesMultiple(t *testing.T) {
 	plan := ResourceDiscoveryPlan{
 		ServiceResources: map[string][]store.ProdResource{
 			"CustodyService": {
-				{ResourceID: "r1", Name: "CustodyAccount", Owner: "CustodyTech", DictionaryID: "d1"},
+				{ResourceID: "r1", Name: "CustodyAccount", Owner: "CustodyTech", DictionaryGroup: "CustodyAccount"},
 			},
 			"AccountingService": {
-				{ResourceID: "r2", Name: "AccountingRecord", Owner: "AcctTech", DictionaryID: "d2"},
+				{ResourceID: "r2", Name: "AccountingRecord", Owner: "AcctTech", DictionaryGroup: "FundAccounting"},
 			},
 		},
 		ResourceAttributes: map[string][]store.Attribute{
-			"d1": {{AttributeID: "a1", Name: "account_number"}},
-			"d2": {{AttributeID: "a2", Name: "nav_value"}},
+			"CustodyAccount": {{AttributeID: "a1", Name: "custody.account_number", GroupID: "CustodyAccount"}},
+			"FundAccounting": {{AttributeID: "a2", Name: "accounting.nav_value", GroupID: "FundAccounting"}},
 		},
 	}
 

@@ -32,32 +32,24 @@ type Service struct {
 
 // ProdResource represents a resource required by products/services.
 type ProdResource struct {
-	ResourceID   string
-	Name         string
-	Description  string
-	Owner        string
-	DictionaryID string
+	ResourceID      string
+	Name            string
+	Description     string
+	Owner           string
+	DictionaryGroup string
 }
 
-// Attribute represents an attribute in a dictionary.
+// Attribute represents an attribute in the dictionary (v3 schema).
 type Attribute struct {
-	AttributeID         string
-	Name                string
-	DetailedDescription string
-	IsPrivate           bool
-	PrivateType         *string
-	DataType            string
-	PrimarySinkURL      string
-	PrimarySourceURL    *string
-	SecondarySourceURL  *string
-	TertiarySourceURL   *string
-}
-
-// Dictionary represents a data dictionary.
-type Dictionary struct {
-	DictionaryID string
-	Name         string
-	Description  string
+	AttributeID     string
+	Name            string
+	LongDescription string
+	GroupID         string
+	Mask            string
+	Domain          string
+	Vector          string
+	Source          string // JSON string
+	Sink            string // JSON string
 }
 
 // NewStore creates a new Store instance and opens a database connection.
@@ -190,108 +182,101 @@ func (s *Store) SeedCatalog(ctx context.Context) error {
 		}
 	}
 
-	// Insert Attributes
+	// Insert Dictionary Attributes (v3 schema)
 	attributes := []struct {
-		name             string
-		description      string
-		isPrivate        bool
-		privateType      *string
-		dataType         string
-		primarySinkURL   string
-		primarySourceURL *string
+		name            string
+		longDescription string
+		groupID         string
+		mask            string
+		domain          string
+		sourceJSON      string
+		sinkJSON        string
 	}{
-		{"account_number", "Custody account identifier", false, nil, "string", "https://custody.example.com/accounts", nil},
-		{"domicile", "Fund domicile jurisdiction", false, nil, "string", "https://registry.example.com/domicile", nil},
-		{"isin", "International Securities Identification Number", false, nil, "string", "https://registry.example.com/isin", nil},
-		{"nav_value", "Net Asset Value", true, strPtr("derived"), "string", "https://accounting.example.com/nav", nil},
+		{
+			"entity.legal_name",
+			"Legal name of the entity for KYC purposes",
+			"KYC",
+			"string",
+			"KYC",
+			`{"type": "manual", "url": "https://kyc.example.com/entity", "required": true}`,
+			`{"type": "database", "url": "postgres://kyc_db/entities", "table": "legal_entities", "field": "legal_name"}`,
+		},
+		{
+			"custody.account_number",
+			"Custody account identifier for asset safekeeping",
+			"CustodyAccount",
+			"string",
+			"Custody",
+			`{"type": "api", "url": "https://custody.example.com/accounts", "method": "GET"}`,
+			`{"type": "database", "url": "postgres://custody_db/accounts", "table": "accounts", "field": "account_number"}`,
+		},
+		{
+			"entity.domicile",
+			"Domicile jurisdiction of the fund or entity",
+			"KYC",
+			"string",
+			"KYC",
+			`{"type": "registry", "url": "https://registry.example.com/jurisdictions", "validated": true}`,
+			`{"type": "database", "url": "postgres://kyc_db/entities", "table": "entities", "field": "domicile"}`,
+		},
+		{
+			"security.isin",
+			"International Securities Identification Number",
+			"Security",
+			"string",
+			"Trading",
+			`{"type": "api", "url": "https://isin-registry.example.com/lookup", "authoritative": true}`,
+			`{"type": "database", "url": "postgres://trading_db/securities", "table": "securities", "field": "isin"}`,
+		},
+		{
+			"accounting.nav_value",
+			"Net Asset Value calculated daily",
+			"FundAccounting",
+			"string",
+			"Accounting",
+			`{"type": "calculated", "formula": "total_assets - total_liabilities", "frequency": "daily"}`,
+			`{"type": "database", "url": "postgres://accounting_db/nav", "table": "daily_nav", "field": "nav_value"}`,
+		},
 	}
 
-	attributeIDs := make(map[string]string)
 	for _, attr := range attributes {
-		var attributeID string
-		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "dsl-ob-poc".attributes (name, detailed_description, is_private, private_type, data_type, primary_sink_url, primary_source_url)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7)
-			 ON CONFLICT (name) DO UPDATE SET detailed_description = EXCLUDED.detailed_description
-			 RETURNING attribute_id`,
-			attr.name, attr.description, attr.isPrivate, attr.privateType, attr.dataType, attr.primarySinkURL, attr.primarySourceURL).Scan(&attributeID)
-		if queryErr != nil {
-			return fmt.Errorf("failed to insert attribute %s: %w", attr.name, queryErr)
-		}
-		attributeIDs[attr.name] = attributeID
-	}
-
-	// Insert Dictionaries
-	dictionaries := []struct {
-		name        string
-		description string
-	}{
-		{"Custody Account Schema", "Schema for custody account resources"},
-		{"Fund Accounting Schema", "Schema for fund accounting resources"},
-		{"Transfer Agency Schema", "Schema for transfer agency resources"},
-	}
-
-	dictionaryIDs := make(map[string]string)
-	for _, dict := range dictionaries {
-		var dictionaryID string
-		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "dsl-ob-poc".dictionaries (name, description)
-			 VALUES ($1, $2)
-			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
-			 RETURNING dictionary_id`,
-			dict.name, dict.description).Scan(&dictionaryID)
-		if queryErr != nil {
-			return fmt.Errorf("failed to insert dictionary %s: %w", dict.name, queryErr)
-		}
-		dictionaryIDs[dict.name] = dictionaryID
-	}
-
-	// Link Dictionaries to Attributes
-	dictionaryAttributeLinks := []struct {
-		dictionary string
-		attribute  string
-		required   bool
-	}{
-		{"Custody Account Schema", "account_number", true},
-		{"Custody Account Schema", "domicile", true},
-		{"Fund Accounting Schema", "nav_value", true},
-		{"Fund Accounting Schema", "isin", true},
-		{"Transfer Agency Schema", "isin", true},
-		{"Transfer Agency Schema", "domicile", false},
-	}
-
-	for _, link := range dictionaryAttributeLinks {
 		_, execErr := tx.ExecContext(ctx,
-			`INSERT INTO "dsl-ob-poc".dictionary_attributes (dictionary_id, attribute_id, is_required)
-			 VALUES ($1, $2, $3)
-			 ON CONFLICT DO NOTHING`,
-			dictionaryIDs[link.dictionary], attributeIDs[link.attribute], link.required)
+			`INSERT INTO "dsl-ob-poc".dictionary (name, long_description, group_id, mask, domain, source, sink)
+			 VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
+			 ON CONFLICT (name) DO UPDATE SET
+				long_description = EXCLUDED.long_description,
+				group_id = EXCLUDED.group_id,
+				mask = EXCLUDED.mask,
+				domain = EXCLUDED.domain,
+				source = EXCLUDED.source,
+				sink = EXCLUDED.sink`,
+			attr.name, attr.longDescription, attr.groupID, attr.mask, attr.domain, attr.sourceJSON, attr.sinkJSON)
 		if execErr != nil {
-			return fmt.Errorf("failed to link dictionary %s to attribute %s: %w", link.dictionary, link.attribute, execErr)
+			return fmt.Errorf("failed to insert dictionary attribute %s: %w", attr.name, execErr)
 		}
 	}
 
 	// Insert Resources
 	resources := []struct {
-		name         string
-		description  string
-		owner        string
-		dictionaryID string
+		name            string
+		description     string
+		owner           string
+		dictionaryGroup string
 	}{
-		{"CustodyAccount", "Custody account resource", "CustodyTech", dictionaryIDs["Custody Account Schema"]},
-		{"FundAccountingRecord", "Fund accounting record resource", "AccountingEng", dictionaryIDs["Fund Accounting Schema"]},
-		{"ShareholderRegistry", "Shareholder registry resource", "TransferAgencyTeam", dictionaryIDs["Transfer Agency Schema"]},
+		{"CustodyAccount", "Custody account resource", "CustodyTech", "CustodyAccount"},
+		{"FundAccountingRecord", "Fund accounting record resource", "AccountingEng", "FundAccounting"},
+		{"ShareholderRegistry", "Shareholder registry resource", "TransferAgencyTeam", "KYC"},
 	}
 
 	resourceIDs := make(map[string]string)
 	for _, res := range resources {
 		var resourceID string
 		queryErr := tx.QueryRowContext(ctx,
-			`INSERT INTO "dsl-ob-poc".prod_resources (name, description, owner, dictionary_id)
+			`INSERT INTO "dsl-ob-poc".prod_resources (name, description, owner, dictionary_group)
 			 VALUES ($1, $2, $3, $4)
 			 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
 			 RETURNING resource_id`,
-			res.name, res.description, res.owner, res.dictionaryID).Scan(&resourceID)
+			res.name, res.description, res.owner, res.dictionaryGroup).Scan(&resourceID)
 		if queryErr != nil {
 			return fmt.Errorf("failed to insert resource %s: %w", res.name, queryErr)
 		}
@@ -462,7 +447,7 @@ func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([
 	var resources []ProdResource
 	for rows.Next() {
 		var res ProdResource
-		if scanErr := rows.Scan(&res.ResourceID, &res.Name, &res.Description, &res.Owner, &res.DictionaryID); scanErr != nil {
+		if scanErr := rows.Scan(&res.ResourceID, &res.Name, &res.Description, &res.Owner, &res.DictionaryGroup); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan resource: %w", scanErr)
 		}
 		resources = append(resources, res)
@@ -475,27 +460,26 @@ func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([
 	return resources, nil
 }
 
-// GetAttributesForDictionary retrieves all attributes for a given dictionary.
-func (s *Store) GetAttributesForDictionary(ctx context.Context, dictionaryID string) ([]Attribute, error) {
+// GetAttributesForDictionaryGroup retrieves all attributes for a given dictionary group.
+func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]Attribute, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT a.attribute_id, a.name, COALESCE(a.detailed_description, ''),
-                a.is_private, a.private_type, a.data_type, a.primary_sink_url,
-                a.primary_source_url, a.secondary_source_url, a.tertiary_source_url
-         FROM "dsl-ob-poc".attributes a
-         JOIN "dsl-ob-poc".dictionary_attributes da ON a.attribute_id = da.attribute_id
-		 WHERE da.dictionary_id = $1`,
-		dictionaryID)
+		`SELECT attribute_id, name, COALESCE(long_description, ''), group_id,
+                COALESCE(mask, 'string'), COALESCE(domain, ''), COALESCE(vector, ''),
+                COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
+         FROM "dsl-ob-poc".dictionary
+         WHERE group_id = $1`,
+		groupID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query attributes: %w", err)
+		return nil, fmt.Errorf("failed to query dictionary attributes: %w", err)
 	}
 	defer rows.Close()
 
 	var attributes []Attribute
 	for rows.Next() {
 		var attr Attribute
-		if scanErr := rows.Scan(&attr.AttributeID, &attr.Name, &attr.DetailedDescription,
-			&attr.IsPrivate, &attr.PrivateType, &attr.DataType, &attr.PrimarySinkURL,
-			&attr.PrimarySourceURL, &attr.SecondarySourceURL, &attr.TertiarySourceURL); scanErr != nil {
+		if scanErr := rows.Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription,
+			&attr.GroupID, &attr.Mask, &attr.Domain, &attr.Vector,
+			&attr.Source, &attr.Sink); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan attribute: %w", scanErr)
 		}
 		attributes = append(attributes, attr)
@@ -506,9 +490,4 @@ func (s *Store) GetAttributesForDictionary(ctx context.Context, dictionaryID str
 	}
 
 	return attributes, nil
-}
-
-// Helper function to create string pointers
-func strPtr(s string) *string {
-	return &s
 }

@@ -1,28 +1,23 @@
--- Creates the schema and tables for the DSL POC
+/*
+v3: Refactors the attributes table to be the central dictionary.
+- Uses JSONB to store rich, complex metadata for sources and sinks.
+- Renames to 'dictionary' as it's the master table.
+- Removes the old 'dictionaries' and 'dictionary_attributes' tables,
+  as an attribute's 'dictionary_id' (now 'group_id') is just a string for grouping.
+- **Sets main schema to "dsl-ob-poc"**
+*/
 CREATE SCHEMA IF NOT EXISTS "dsl-ob-poc";
 
 -- Table to store immutable, versioned DSL files
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dsl_ob (
-    -- Use a UUID for the version ID
     version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    -- The CBU this DSL version belongs to
     cbu_id VARCHAR(255) NOT NULL,
-
-    -- The full S-expression DSL text
     dsl_text TEXT NOT NULL,
-
-    -- Timestamp for ordering
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
--- Index for fast lookups of the latest DSL for a CBU
 CREATE INDEX IF NOT EXISTS idx_dsl_ob_cbu_id_created_at
 ON "dsl-ob-poc".dsl_ob (cbu_id, created_at DESC);
-
--- ============================================================================
--- NEW TABLES FOR PRODUCT CATALOG, SERVICES, RESOURCES, AND METADATA
--- ============================================================================
 
 -- Products table: Core product definitions
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
@@ -32,7 +27,6 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".products (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-
 CREATE INDEX IF NOT EXISTS idx_products_name ON "dsl-ob-poc".products (name);
 
 -- Services table: Services that can be offered with or without products
@@ -43,99 +37,75 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".services (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-
 CREATE INDEX IF NOT EXISTS idx_services_name ON "dsl-ob-poc".services (name);
 
--- Join table: Products to Services
+-- Product <-> Service Join Table
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
-    product_id UUID NOT NULL,
-    service_id UUID NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    PRIMARY KEY (product_id, service_id),
-    CONSTRAINT fk_ps_product FOREIGN KEY (product_id) REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ps_service FOREIGN KEY (service_id) REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE
+    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+    service_id UUID NOT NULL REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
+    PRIMARY KEY (product_id, service_id)
 );
 
--- Product Resources table: Resources required by products/services
+-- ============================================================================
+-- DICTIONARY AND RESOURCE TABLES (REFACTORED)
+-- ============================================================================
+
+-- Master Data Dictionary (Attributes table)
+-- This is the central pillar.
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionary (
+    attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- The unique "variable name" for the DSL, e.g., "entity.legal_name"
+    name VARCHAR(255) NOT NULL UNIQUE,
+
+    -- Description for AI agent discovery and human readability
+    long_description TEXT,
+
+    -- The "dictionary" this attribute belongs to (e.g., "KYC", "Settlement")
+    -- This replaces the old 'dictionaries' table.
+    group_id VARCHAR(100) NOT NULL DEFAULT 'default',
+
+    -- Metadata
+    mask VARCHAR(50) DEFAULT 'string', -- 'string', 'ssn', 'date'
+    domain VARCHAR(100), -- 'KYC', 'AML', 'Trading', 'Settlement'
+    vector TEXT,         -- For AI semantic search
+
+    -- Rich metadata stored as JSON
+    source JSONB,        -- See SourceMetadata struct in Go
+    sink JSONB,          -- See SinkMetadata struct in Go
+
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_dictionary_name ON "dsl-ob-poc".dictionary (name);
+CREATE INDEX IF NOT EXISTS idx_dictionary_group_id ON "dsl-ob-poc".dictionary (group_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_domain ON "dsl-ob-poc".dictionary (domain);
+
+
+-- Production Resources table
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".prod_resources (
     resource_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     owner VARCHAR(255) NOT NULL,
-    dictionary_id UUID,
+
+    -- A resource is now defined by its "dictionary_group"
+    -- This replaces the foreign key to the old 'dictionaries' table.
+    -- e.g., "CustodyAccount" resource uses the "CustodyAccount" group_id.
+    dictionary_group VARCHAR(100),
+
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    UNIQUE (name)
-    -- Note: dictionary_id will reference dictionaries table via FK after that table is created
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
 
 CREATE INDEX IF NOT EXISTS idx_prod_resources_name ON "dsl-ob-poc".prod_resources (name);
 CREATE INDEX IF NOT EXISTS idx_prod_resources_owner ON "dsl-ob-poc".prod_resources (owner);
+CREATE INDEX IF NOT EXISTS idx_prod_resources_dict_group ON "dsl-ob-poc".prod_resources (dictionary_group);
 
--- Dictionaries table: Master data dictionaries that contain attributes
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionaries (
-    dictionary_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    attribute_id UUID,
-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
-    -- Note: attribute_id will reference attributes table via FK after that table is created
-);
 
-CREATE INDEX IF NOT EXISTS idx_dictionaries_name ON "dsl-ob-poc".dictionaries (name);
-
--- Join table: Dictionaries to Attributes
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".dictionary_attributes (
-    dictionary_id UUID NOT NULL,
-    attribute_id UUID NOT NULL,
-    is_required BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    PRIMARY KEY (dictionary_id, attribute_id),
-    CONSTRAINT fk_da_dictionary FOREIGN KEY (dictionary_id) REFERENCES "dsl-ob-poc".dictionaries (dictionary_id) ON DELETE CASCADE,
-    CONSTRAINT fk_da_attribute FOREIGN KEY (attribute_id) REFERENCES "dsl-ob-poc".attributes (attribute_id) ON DELETE CASCADE
-);
-
--- Attributes table: Detailed attribute definitions with metadata
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".attributes (
-    attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL UNIQUE,
-    detailed_description TEXT,
-    is_private BOOLEAN DEFAULT FALSE,
-    private_type VARCHAR(50),  -- 'derived' or 'given', only applicable if is_private = TRUE
-    primary_source_url TEXT,
-    secondary_source_url TEXT,
-    tertiary_source_url TEXT,
-    data_type VARCHAR(50) DEFAULT 'string',  -- 'string', 'mask', 'struct', etc.
-    primary_sink_url TEXT NOT NULL,  -- Where the attribute is persisted
-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    CONSTRAINT chk_private_type CHECK (
-        (is_private = FALSE AND private_type IS NULL) OR
-        (is_private = TRUE AND private_type IN ('derived', 'given'))
-    ),
-    CONSTRAINT chk_data_type CHECK (data_type IN ('string', 'mask', 'struct'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_attributes_name ON "dsl-ob-poc".attributes (name);
-CREATE INDEX IF NOT EXISTS idx_attributes_is_private ON "dsl-ob-poc".attributes (is_private);
-CREATE INDEX IF NOT EXISTS idx_attributes_private_type ON "dsl-ob-poc".attributes (private_type);
-
--- Add foreign key constraints now that all tables exist
-ALTER TABLE "dsl-ob-poc".prod_resources
-ADD CONSTRAINT fk_prod_resources_dictionary
-FOREIGN KEY (dictionary_id) REFERENCES "dsl-ob-poc".dictionaries (dictionary_id) ON DELETE SET NULL;
-
-ALTER TABLE "dsl-ob-poc".dictionaries
-ADD CONSTRAINT fk_dictionaries_attribute
-FOREIGN KEY (attribute_id) REFERENCES "dsl-ob-poc".attributes (attribute_id) ON DELETE SET NULL;
-
--- Join table: Services to Resources
+-- Service <-> Resource Join Table
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".service_resources (
-    service_id UUID NOT NULL,
-    resource_id UUID NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    PRIMARY KEY (service_id, resource_id),
-    CONSTRAINT fk_sr_service FOREIGN KEY (service_id) REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
-    CONSTRAINT fk_sr_resource FOREIGN KEY (resource_id) REFERENCES "dsl-ob-poc".prod_resources (resource_id) ON DELETE CASCADE
+    service_id UUID NOT NULL REFERENCES "dsl-ob-poc".services (service_id) ON DELETE CASCADE,
+    resource_id UUID NOT NULL REFERENCES "dsl-ob-poc".prod_resources (resource_id) ON DELETE CASCADE,
+    PRIMARY KEY (service_id, resource_id)
 );

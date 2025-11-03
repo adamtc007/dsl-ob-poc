@@ -40,6 +40,8 @@ make init-db            # Initialize schema and tables
 ./dsl-poc create --cbu="CBU-1234"
 ./dsl-poc add-products --cbu="CBU-1234" --products="CUSTODY,FUND_ACCOUNTING"
 ./dsl-poc discover-kyc --cbu="CBU-1234"  # Requires GEMINI_API_KEY
+./dsl-poc discover-services --cbu="CBU-1234"  # Service discovery and planning
+./dsl-poc discover-resources --cbu="CBU-1234"  # Resource discovery and planning
 ./dsl-poc history --cbu="CBU-1234"       # View complete DSL evolution
 ```
 
@@ -93,12 +95,24 @@ S-expressions with nested structure representing onboarding progression:
 - DSL generation and parsing tested with realistic scenarios
 - CLI command logic tested with various input combinations
 - Run single test: `go test -v ./internal/cli -run TestHistoryCommand`
+- Run all tests: `make test`
+- Generate coverage report: `make test-coverage`
 
 ## Performance Notes
 
 **greenteagc Benefits**: 60% reduction in GC pause times, ~4% better throughput, more predictable latency for concurrent workloads (requires Go 1.21+).
 
 **Database Optimizations**: Composite indexes on `(cbu_id, created_at DESC)` for fast latest lookups, soft deletes preserve data integrity, foreign key constraints with appropriate cascades.
+
+## Code Quality
+
+**Linting and Formatting**:
+```bash
+make lint               # Run golangci-lint with 20+ linters
+make fmt                # Format code with gofmt
+make vet                # Run go vet
+make check              # Run fmt, vet, and lint (pre-commit check)
+```
 
 ## CI/CD
 

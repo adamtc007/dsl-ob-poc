@@ -199,9 +199,9 @@ func AddDiscoveredResources(currentDSL string, plan ResourceDiscoveryPlan) (stri
 		b.WriteString(fmt.Sprintf("  (resource.create %q\n", resource.Name))
 		b.WriteString(fmt.Sprintf("    (owner %q)\n", resource.Owner))
 
-		attributes := plan.ResourceAttributes[resource.DictionaryID]
-		for _, attr := range attributes {
-			b.WriteString(fmt.Sprintf("    (attr.%q)\n", attr.Name))
+		attributes := plan.ResourceAttributes[resource.DictionaryGroup]
+		for i := range attributes {
+			b.WriteString(fmt.Sprintf("    (attr.%q)\n", attributes[i].Name))
 		}
 		b.WriteString("  )\n")
 	}
