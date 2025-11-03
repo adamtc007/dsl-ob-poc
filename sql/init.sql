@@ -135,3 +135,107 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".service_resources (
     resource_id UUID NOT NULL REFERENCES "dsl-ob-poc".prod_resources (resource_id) ON DELETE CASCADE,
     PRIMARY KEY (service_id, resource_id)
 );
+
+-- ============================================================================
+-- ENTITY RELATIONSHIP MODEL
+-- ============================================================================
+
+-- Roles table: Defines roles entities can play within a CBU
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".roles (
+    role_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+CREATE INDEX IF NOT EXISTS idx_roles_name ON "dsl-ob-poc".roles (name);
+
+-- Entity Types table: Defines the different types of entities
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_types (
+    entity_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    table_name VARCHAR(255) NOT NULL, -- Points to specific entity type table
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+CREATE INDEX IF NOT EXISTS idx_entity_types_name ON "dsl-ob-poc".entity_types (name);
+CREATE INDEX IF NOT EXISTS idx_entity_types_table ON "dsl-ob-poc".entity_types (table_name);
+
+-- Entities table: Central entity registry
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entities (
+    entity_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entity_type_id UUID NOT NULL REFERENCES "dsl-ob-poc".entity_types (entity_type_id) ON DELETE CASCADE,
+    external_id VARCHAR(255), -- Reference to the specific entity type table
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+CREATE INDEX IF NOT EXISTS idx_entities_type ON "dsl-ob-poc".entities (entity_type_id);
+CREATE INDEX IF NOT EXISTS idx_entities_external_id ON "dsl-ob-poc".entities (external_id);
+CREATE INDEX IF NOT EXISTS idx_entities_name ON "dsl-ob-poc".entities (name);
+
+-- CBU Entity Roles table: Links CBUs to entities through roles
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".cbu_entity_roles (
+    cbu_entity_role_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cbu_id UUID NOT NULL REFERENCES "dsl-ob-poc".cbus (cbu_id) ON DELETE CASCADE,
+    entity_id UUID NOT NULL REFERENCES "dsl-ob-poc".entities (entity_id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES "dsl-ob-poc".roles (role_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    UNIQUE (cbu_id, entity_id, role_id)
+);
+CREATE INDEX IF NOT EXISTS idx_cbu_entity_roles_cbu ON "dsl-ob-poc".cbu_entity_roles (cbu_id);
+CREATE INDEX IF NOT EXISTS idx_cbu_entity_roles_entity ON "dsl-ob-poc".cbu_entity_roles (entity_id);
+CREATE INDEX IF NOT EXISTS idx_cbu_entity_roles_role ON "dsl-ob-poc".cbu_entity_roles (role_id);
+
+-- ============================================================================
+-- ENTITY TYPE TABLES
+-- ============================================================================
+
+-- Limited Company entity type
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_limited_companies (
+    limited_company_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_name VARCHAR(255) NOT NULL,
+    registration_number VARCHAR(100),
+    jurisdiction VARCHAR(100),
+    incorporation_date DATE,
+    registered_address TEXT,
+    business_nature TEXT,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+CREATE INDEX IF NOT EXISTS idx_limited_companies_reg_num ON "dsl-ob-poc".entity_limited_companies (registration_number);
+CREATE INDEX IF NOT EXISTS idx_limited_companies_jurisdiction ON "dsl-ob-poc".entity_limited_companies (jurisdiction);
+
+-- Partnership entity type
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_partnerships (
+    partnership_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    partnership_name VARCHAR(255) NOT NULL,
+    partnership_type VARCHAR(100), -- 'General', 'Limited', 'Limited Liability'
+    jurisdiction VARCHAR(100),
+    formation_date DATE,
+    principal_place_business TEXT,
+    partnership_agreement_date DATE,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+CREATE INDEX IF NOT EXISTS idx_partnerships_type ON "dsl-ob-poc".entity_partnerships (partnership_type);
+CREATE INDEX IF NOT EXISTS idx_partnerships_jurisdiction ON "dsl-ob-poc".entity_partnerships (jurisdiction);
+
+-- Proper Person (Individual) entity type
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_individuals (
+    individual_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
+    middle_names VARCHAR(255),
+    date_of_birth DATE,
+    nationality VARCHAR(100),
+    residence_address TEXT,
+    id_document_type VARCHAR(100), -- 'Passport', 'National ID', 'Driving License'
+    id_document_number VARCHAR(100),
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+CREATE INDEX IF NOT EXISTS idx_individuals_full_name ON "dsl-ob-poc".entity_individuals (last_name, first_name);
+CREATE INDEX IF NOT EXISTS idx_individuals_nationality ON "dsl-ob-poc".entity_individuals (nationality);
+CREATE INDEX IF NOT EXISTS idx_individuals_id_document ON "dsl-ob-poc".entity_individuals (id_document_type, id_document_number);

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"dsl-ob-poc/internal/dictionary"
@@ -60,6 +61,72 @@ type Attribute struct {
 	Vector          string
 	Source          string // JSON string
 	Sink            string // JSON string
+}
+
+// Role represents a role that entities can play within a CBU.
+type Role struct {
+	RoleID      string
+	Name        string
+	Description string
+}
+
+// EntityType represents the different types of entities.
+type EntityType struct {
+	EntityTypeID string
+	Name         string
+	Description  string
+	TableName    string
+}
+
+// Entity represents an entity in the central registry.
+type Entity struct {
+	EntityID     string
+	EntityTypeID string
+	ExternalID   string
+	Name         string
+}
+
+// CBUEntityRole represents the relationship between CBUs, entities, and roles.
+type CBUEntityRole struct {
+	CBUEntityRoleID string
+	CBUID           string
+	EntityID        string
+	RoleID          string
+}
+
+// LimitedCompany represents a limited company entity.
+type LimitedCompany struct {
+	LimitedCompanyID   string
+	CompanyName        string
+	RegistrationNumber string
+	Jurisdiction       string
+	IncorporationDate  *time.Time
+	RegisteredAddress  string
+	BusinessNature     string
+}
+
+// Partnership represents a partnership entity.
+type Partnership struct {
+	PartnershipID            string
+	PartnershipName          string
+	PartnershipType          string
+	Jurisdiction             string
+	FormationDate            *time.Time
+	PrincipalPlaceBusiness   string
+	PartnershipAgreementDate *time.Time
+}
+
+// Individual represents an individual (proper person) entity.
+type Individual struct {
+	IndividualID     string
+	FirstName        string
+	LastName         string
+	MiddleNames      string
+	DateOfBirth      *time.Time
+	Nationality      string
+	ResidenceAddress string
+	IDDocumentType   string
+	IDDocumentNumber string
 }
 
 // NewStore creates a new Store instance and opens a database connection.
@@ -661,4 +728,275 @@ func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID str
 	}
 
 	return attributes, nil
+}
+
+// ============================================================================
+// CBU CRUD OPERATIONS
+// ============================================================================
+
+// CreateCBU creates a new CBU
+func (s *Store) CreateCBU(ctx context.Context, name, description, naturePurpose string) (string, error) {
+	query := `INSERT INTO "dsl-ob-poc".cbus (name, description, nature_purpose)
+	         VALUES ($1, $2, $3) RETURNING cbu_id`
+
+	var cbuID string
+	err := s.db.QueryRowContext(ctx, query, name, description, naturePurpose).Scan(&cbuID)
+	if err != nil {
+		return "", fmt.Errorf("failed to create CBU: %w", err)
+	}
+
+	return cbuID, nil
+}
+
+// ListCBUs retrieves all CBUs
+func (s *Store) ListCBUs(ctx context.Context) ([]CBU, error) {
+	query := `SELECT cbu_id, name, description, nature_purpose
+	         FROM "dsl-ob-poc".cbus
+	         ORDER BY name`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list CBUs: %w", err)
+	}
+	defer rows.Close()
+
+	var cbus []CBU
+	for rows.Next() {
+		var cbu CBU
+		if scanErr := rows.Scan(&cbu.CBUID, &cbu.Name, &cbu.Description, &cbu.NaturePurpose); scanErr != nil {
+			return nil, fmt.Errorf("failed to scan CBU: %w", scanErr)
+		}
+		cbus = append(cbus, cbu)
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("error iterating CBUs: %w", rowsErr)
+	}
+
+	return cbus, nil
+}
+
+// GetCBUByID retrieves a CBU by ID
+func (s *Store) GetCBUByID(ctx context.Context, cbuID string) (*CBU, error) {
+	query := `SELECT cbu_id, name, description, nature_purpose
+	         FROM "dsl-ob-poc".cbus
+	         WHERE cbu_id = $1`
+
+	var cbu CBU
+	err := s.db.QueryRowContext(ctx, query, cbuID).Scan(
+		&cbu.CBUID, &cbu.Name, &cbu.Description, &cbu.NaturePurpose)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("CBU not found: %s", cbuID)
+		}
+		return nil, fmt.Errorf("failed to get CBU: %w", err)
+	}
+
+	return &cbu, nil
+}
+
+// UpdateCBU updates a CBU
+func (s *Store) UpdateCBU(ctx context.Context, cbuID, name, description, naturePurpose string) error {
+	setParts := []string{}
+	args := []interface{}{}
+	argIndex := 1
+
+	if name != "" {
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argIndex))
+		args = append(args, name)
+		argIndex++
+	}
+	if description != "" {
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argIndex))
+		args = append(args, description)
+		argIndex++
+	}
+	if naturePurpose != "" {
+		setParts = append(setParts, fmt.Sprintf("nature_purpose = $%d", argIndex))
+		args = append(args, naturePurpose)
+		argIndex++
+	}
+
+	if len(setParts) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	setParts = append(setParts, fmt.Sprintf("updated_at = $%d", argIndex))
+	args = append(args, time.Now())
+	argIndex++
+
+	args = append(args, cbuID)
+
+	query := fmt.Sprintf(`UPDATE "dsl-ob-poc".cbus SET %s WHERE cbu_id = $%d`,
+		strings.Join(setParts, ", "), argIndex)
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update CBU: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("CBU not found: %s", cbuID)
+	}
+
+	return nil
+}
+
+// DeleteCBU deletes a CBU
+func (s *Store) DeleteCBU(ctx context.Context, cbuID string) error {
+	query := `DELETE FROM "dsl-ob-poc".cbus WHERE cbu_id = $1`
+
+	result, err := s.db.ExecContext(ctx, query, cbuID)
+	if err != nil {
+		return fmt.Errorf("failed to delete CBU: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("CBU not found: %s", cbuID)
+	}
+
+	return nil
+}
+
+// ============================================================================
+// ROLE CRUD OPERATIONS
+// ============================================================================
+
+// CreateRole creates a new role
+func (s *Store) CreateRole(ctx context.Context, name, description string) (string, error) {
+	query := `INSERT INTO "dsl-ob-poc".roles (name, description)
+	         VALUES ($1, $2) RETURNING role_id`
+
+	var roleID string
+	err := s.db.QueryRowContext(ctx, query, name, description).Scan(&roleID)
+	if err != nil {
+		return "", fmt.Errorf("failed to create role: %w", err)
+	}
+
+	return roleID, nil
+}
+
+// ListRoles retrieves all roles
+func (s *Store) ListRoles(ctx context.Context) ([]Role, error) {
+	query := `SELECT role_id, name, description
+	         FROM "dsl-ob-poc".roles
+	         ORDER BY name`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list roles: %w", err)
+	}
+	defer rows.Close()
+
+	var roles []Role
+	for rows.Next() {
+		var role Role
+		if scanErr := rows.Scan(&role.RoleID, &role.Name, &role.Description); scanErr != nil {
+			return nil, fmt.Errorf("failed to scan role: %w", scanErr)
+		}
+		roles = append(roles, role)
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("error iterating roles: %w", rowsErr)
+	}
+
+	return roles, nil
+}
+
+// GetRoleByID retrieves a role by ID
+func (s *Store) GetRoleByID(ctx context.Context, roleID string) (*Role, error) {
+	query := `SELECT role_id, name, description
+	         FROM "dsl-ob-poc".roles
+	         WHERE role_id = $1`
+
+	var role Role
+	err := s.db.QueryRowContext(ctx, query, roleID).Scan(
+		&role.RoleID, &role.Name, &role.Description)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("role not found: %s", roleID)
+		}
+		return nil, fmt.Errorf("failed to get role: %w", err)
+	}
+
+	return &role, nil
+}
+
+// UpdateRole updates a role
+func (s *Store) UpdateRole(ctx context.Context, roleID, name, description string) error {
+	setParts := []string{}
+	args := []interface{}{}
+	argIndex := 1
+
+	if name != "" {
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argIndex))
+		args = append(args, name)
+		argIndex++
+	}
+	if description != "" {
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argIndex))
+		args = append(args, description)
+		argIndex++
+	}
+
+	if len(setParts) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	setParts = append(setParts, fmt.Sprintf("updated_at = $%d", argIndex))
+	args = append(args, time.Now())
+	argIndex++
+
+	args = append(args, roleID)
+
+	query := fmt.Sprintf(`UPDATE "dsl-ob-poc".roles SET %s WHERE role_id = $%d`,
+		strings.Join(setParts, ", "), argIndex)
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update role: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("role not found: %s", roleID)
+	}
+
+	return nil
+}
+
+// DeleteRole deletes a role
+func (s *Store) DeleteRole(ctx context.Context, roleID string) error {
+	query := `DELETE FROM "dsl-ob-poc".roles WHERE role_id = $1`
+
+	result, err := s.db.ExecContext(ctx, query, roleID)
+	if err != nil {
+		return fmt.Errorf("failed to delete role: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("role not found: %s", roleID)
+	}
+
+	return nil
 }

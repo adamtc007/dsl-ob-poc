@@ -100,6 +100,30 @@ func run() int {
 	case "history":
 		err = cli.RunHistory(ctx, dbStore, args)
 
+	// CBU CRUD COMMANDS
+	case "cbu-create":
+		err = cli.RunCBUCreate(ctx, dbStore, args)
+	case "cbu-list":
+		err = cli.RunCBUList(ctx, dbStore, args)
+	case "cbu-get":
+		err = cli.RunCBUGet(ctx, dbStore, args)
+	case "cbu-update":
+		err = cli.RunCBUUpdate(ctx, dbStore, args)
+	case "cbu-delete":
+		err = cli.RunCBUDelete(ctx, dbStore, args)
+
+	// ROLE CRUD COMMANDS
+	case "role-create":
+		err = cli.RunRoleCreate(ctx, dbStore, args)
+	case "role-list":
+		err = cli.RunRoleList(ctx, dbStore, args)
+	case "role-get":
+		err = cli.RunRoleGet(ctx, dbStore, args)
+	case "role-update":
+		err = cli.RunRoleUpdate(ctx, dbStore, args)
+	case "role-delete":
+		err = cli.RunRoleDelete(ctx, dbStore, args)
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
@@ -115,7 +139,7 @@ func run() int {
 }
 
 func printUsage() {
-	fmt.Println("Onboarding DSL POC CLI (v5: History-Aware)")
+	fmt.Println("Onboarding DSL POC CLI (v8: Entity Relationship Model)")
 	fmt.Println("Usage: dsl-poc <command> [options]")
 	fmt.Println("\nSetup Commands:")
 	fmt.Println("  init-db                      (One-time) Initializes the PostgreSQL schema and all tables.")
@@ -129,6 +153,18 @@ func printUsage() {
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v5) Discovers and appends resources plan.")
 	fmt.Println("  populate-attributes --cbu=<cbu-id> (v6) Populates attribute values from runtime sources.")
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v7) Resolves and binds attribute values deterministically.")
+	fmt.Println("\nCBU Management Commands:")
+	fmt.Println("  cbu-create --name=<name> [--description=<desc>] [--nature-purpose=<purpose>]")
+	fmt.Println("  cbu-list                     Lists all CBUs")
+	fmt.Println("  cbu-get --id=<cbu-id>        Get CBU details")
+	fmt.Println("  cbu-update --id=<cbu-id> [--name=<name>] [--description=<desc>] [--nature-purpose=<purpose>]")
+	fmt.Println("  cbu-delete --id=<cbu-id>     Delete CBU")
+	fmt.Println("\nRole Management Commands:")
+	fmt.Println("  role-create --name=<name> [--description=<desc>]")
+	fmt.Println("  role-list                    Lists all roles")
+	fmt.Println("  role-get --id=<role-id>      Get role details")
+	fmt.Println("  role-update --id=<role-id> [--name=<name>] [--description=<desc>]")
+	fmt.Println("  role-delete --id=<role-id>   Delete role")
 	fmt.Println("\nUtility Commands:")
 	fmt.Println("  history --cbu=<cbu-id>       Views the full, versioned DSL evolution for a case.")
 }
