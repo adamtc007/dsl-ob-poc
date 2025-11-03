@@ -519,3 +519,178 @@ func (m *MockStore) GetDSLHistory(ctx context.Context, cbuID string) ([]store.DS
 
 	return history, nil
 }
+
+// Enhanced Onboarding State Management for mock adapter
+func (m *MockStore) CreateOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error) {
+	// For mock store, create a mock onboarding session
+	session := &store.OnboardingSession{
+		OnboardingID:       fmt.Sprintf("mock-onboarding-%d", time.Now().Unix()),
+		CBUID:              cbuID,
+		CurrentState:       store.StateCreated,
+		CurrentVersion:     1,
+		LatestDSLVersionID: nil,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+	return session, nil
+}
+
+func (m *MockStore) GetOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error) {
+	// For mock store, return a mock onboarding session
+	session := &store.OnboardingSession{
+		OnboardingID:       "mock-onboarding-session",
+		CBUID:              cbuID,
+		CurrentState:       store.StateCreated,
+		CurrentVersion:     1,
+		LatestDSLVersionID: nil,
+		CreatedAt:          time.Now().Add(-24 * time.Hour),
+		UpdatedAt:          time.Now(),
+	}
+	return session, nil
+}
+
+func (m *MockStore) UpdateOnboardingState(ctx context.Context, cbuID string, newState store.OnboardingState, dslVersionID string) error {
+	// For mock store, we don't actually update - just return success
+	return nil
+}
+
+func (m *MockStore) InsertDSLWithState(ctx context.Context, cbuID, dslText string, state store.OnboardingState) (string, error) {
+	// For mock store, return a mock version ID with state awareness
+	return fmt.Sprintf("mock-version-state-%d", time.Now().Unix()), nil
+}
+
+func (m *MockStore) GetLatestDSLWithState(ctx context.Context, cbuID string) (*store.DSLVersionWithState, error) {
+	if err := m.loadData(); err != nil {
+		return nil, err
+	}
+
+	// Find the latest DSL record for this CBU
+	var latest DSLRecord
+	var found bool
+
+	for _, record := range m.dslRecords {
+		if record.CBUID == cbuID {
+			if !found {
+				latest = record
+				found = true
+			} else {
+				// Simple string comparison for mock - in real DB this would use timestamp
+				if record.CreatedAt > latest.CreatedAt {
+					latest = record
+				}
+			}
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("no DSL found for CBU: %s", cbuID)
+	}
+
+	// Parse time string
+	createdAt, err := time.Parse(time.RFC3339, latest.CreatedAt)
+	if err != nil {
+		createdAt = time.Now() // fallback
+	}
+
+	// Create DSLVersionWithState from mock data
+	dslVersion := &store.DSLVersionWithState{
+		VersionID:       latest.VersionID,
+		CBUID:           latest.CBUID,
+		DSLText:         latest.DSLText,
+		OnboardingState: store.StateCreated, // Default state for mock
+		VersionNumber:   1,                  // Default version for mock
+		CreatedAt:       createdAt,
+	}
+
+	return dslVersion, nil
+}
+
+func (m *MockStore) GetDSLHistoryWithState(ctx context.Context, cbuID string) ([]store.DSLVersionWithState, error) {
+	if err := m.loadData(); err != nil {
+		return nil, err
+	}
+
+	var history []store.DSLVersionWithState
+	version := 1
+
+	for _, record := range m.dslRecords {
+		if record.CBUID == cbuID {
+			// Parse time string
+			createdAt, err := time.Parse(time.RFC3339, record.CreatedAt)
+			if err != nil {
+				createdAt = time.Now() // fallback
+			}
+
+			dslVersion := store.DSLVersionWithState{
+				VersionID:       record.VersionID,
+				CBUID:           record.CBUID,
+				DSLText:         record.DSLText,
+				OnboardingState: store.StateCreated, // Default state for mock
+				VersionNumber:   version,
+				CreatedAt:       createdAt,
+			}
+			history = append(history, dslVersion)
+			version++
+		}
+	}
+
+	return history, nil
+}
+
+func (m *MockStore) GetDSLByVersion(ctx context.Context, cbuID string, versionNumber int) (*store.DSLVersionWithState, error) {
+	if err := m.loadData(); err != nil {
+		return nil, err
+	}
+
+	// For mock store, just return the first record matching CBU if version exists
+	currentVersion := 1
+	for _, record := range m.dslRecords {
+		if record.CBUID == cbuID {
+			if currentVersion == versionNumber {
+				// Parse time string
+				createdAt, err := time.Parse(time.RFC3339, record.CreatedAt)
+				if err != nil {
+					createdAt = time.Now() // fallback
+				}
+
+				dslVersion := &store.DSLVersionWithState{
+					VersionID:       record.VersionID,
+					CBUID:           record.CBUID,
+					DSLText:         record.DSLText,
+					OnboardingState: store.StateCreated, // Default state for mock
+					VersionNumber:   versionNumber,
+					CreatedAt:       createdAt,
+				}
+				return dslVersion, nil
+			}
+			currentVersion++
+		}
+	}
+
+	return nil, fmt.Errorf("no DSL version %d found for CBU: %s", versionNumber, cbuID)
+}
+
+func (m *MockStore) ListOnboardingSessions(ctx context.Context) ([]store.OnboardingSession, error) {
+	// For mock store, return a list of mock sessions
+	sessions := []store.OnboardingSession{
+		{
+			OnboardingID:       "mock-session-1",
+			CBUID:              "CBU-1234",
+			CurrentState:       store.StateCreated,
+			CurrentVersion:     1,
+			LatestDSLVersionID: nil,
+			CreatedAt:          time.Now().Add(-24 * time.Hour),
+			UpdatedAt:          time.Now(),
+		},
+		{
+			OnboardingID:       "mock-session-2",
+			CBUID:              "CBU-5678",
+			CurrentState:       store.StateProductsAdded,
+			CurrentVersion:     2,
+			LatestDSLVersionID: nil,
+			CreatedAt:          time.Now().Add(-12 * time.Hour),
+			UpdatedAt:          time.Now().Add(-1 * time.Hour),
+		},
+	}
+	return sessions, nil
+}

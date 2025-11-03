@@ -26,11 +26,19 @@ func RunDiscoverServices(ctx context.Context, ds datastore.DataStore, args []str
 
 	log.Printf("Starting service discovery (Step 4) for CBU: %s", *cbuID)
 
-	// 1. Get the latest DSL (should be v3)
-	currentDSL, err := ds.GetLatestDSL(ctx, *cbuID)
+	// 1. Get the current onboarding session
+	session, err := ds.GetOnboardingSession(ctx, *cbuID)
+	if err != nil {
+		return fmt.Errorf("failed to get onboarding session for CBU %s: %w", *cbuID, err)
+	}
+
+	// 2. Get the latest DSL with state information
+	currentDSLState, err := ds.GetLatestDSLWithState(ctx, *cbuID)
 	if err != nil {
 		return err
 	}
+
+	currentDSL := currentDSLState.DSLText
 
 	// 2. Parse product names from DSL (simple parsing for POC)
 	productNames, err := dsl.ParseProductNames(currentDSL)
@@ -66,13 +74,20 @@ func RunDiscoverServices(ctx context.Context, ds datastore.DataStore, args []str
 		return fmt.Errorf("failed to generate new DSL: %w", err)
 	}
 
-	// 5. Save the new DSL version (v4)
-	versionID, err := ds.InsertDSL(ctx, *cbuID, newDSL)
+	// 5. Save the new DSL with SERVICES_DISCOVERED state
+	versionID, err := ds.InsertDSLWithState(ctx, *cbuID, newDSL, store.StateServicesDiscovered)
 	if err != nil {
 		return fmt.Errorf("failed to save new DSL version: %w", err)
 	}
 
-	fmt.Printf("Created new case version (v4): %s\n", versionID)
+	// 6. Update onboarding session state
+	err = ds.UpdateOnboardingState(ctx, *cbuID, store.StateServicesDiscovered, versionID)
+	if err != nil {
+		return fmt.Errorf("failed to update onboarding state: %w", err)
+	}
+
+	fmt.Printf("🛠️ Updated case from %s to %s\n", currentDSLState.OnboardingState, store.StateServicesDiscovered)
+	fmt.Printf("📝 DSL version (v%d): %s\n", session.CurrentVersion+1, versionID)
 	fmt.Println("---")
 	fmt.Println(newDSL)
 	fmt.Println("---")

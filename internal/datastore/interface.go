@@ -50,6 +50,16 @@ type DataStore interface {
 	InsertDSL(ctx context.Context, cbuID, dslText string) (string, error)
 	GetDSLHistory(ctx context.Context, cbuID string) ([]store.DSLVersion, error)
 
+	// Enhanced Onboarding State Management
+	CreateOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error)
+	GetOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error)
+	UpdateOnboardingState(ctx context.Context, cbuID string, newState store.OnboardingState, dslVersionID string) error
+	InsertDSLWithState(ctx context.Context, cbuID, dslText string, state store.OnboardingState) (string, error)
+	GetLatestDSLWithState(ctx context.Context, cbuID string) (*store.DSLVersionWithState, error)
+	GetDSLHistoryWithState(ctx context.Context, cbuID string) ([]store.DSLVersionWithState, error)
+	GetDSLByVersion(ctx context.Context, cbuID string, versionNumber int) (*store.DSLVersionWithState, error)
+	ListOnboardingSessions(ctx context.Context) ([]store.OnboardingSession, error)
+
 	// Attribute Value Operations
 	ResolveValueFor(ctx context.Context, cbuID, attributeID string) (json.RawMessage, map[string]any, string, error)
 	UpsertAttributeValue(ctx context.Context, cbuID string, dslVersion int, attributeID string, value json.RawMessage, state string, source map[string]any) error
@@ -205,6 +215,39 @@ func (p *postgresAdapter) GetDSLHistory(ctx context.Context, cbuID string) ([]st
 	return p.store.GetDSLHistory(ctx, cbuID)
 }
 
+// Enhanced Onboarding State Management for postgres adapter
+func (p *postgresAdapter) CreateOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error) {
+	return p.store.CreateOnboardingSession(ctx, cbuID)
+}
+
+func (p *postgresAdapter) GetOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error) {
+	return p.store.GetOnboardingSession(ctx, cbuID)
+}
+
+func (p *postgresAdapter) UpdateOnboardingState(ctx context.Context, cbuID string, newState store.OnboardingState, dslVersionID string) error {
+	return p.store.UpdateOnboardingState(ctx, cbuID, newState, dslVersionID)
+}
+
+func (p *postgresAdapter) InsertDSLWithState(ctx context.Context, cbuID, dslText string, state store.OnboardingState) (string, error) {
+	return p.store.InsertDSLWithState(ctx, cbuID, dslText, state)
+}
+
+func (p *postgresAdapter) GetLatestDSLWithState(ctx context.Context, cbuID string) (*store.DSLVersionWithState, error) {
+	return p.store.GetLatestDSLWithState(ctx, cbuID)
+}
+
+func (p *postgresAdapter) GetDSLHistoryWithState(ctx context.Context, cbuID string) ([]store.DSLVersionWithState, error) {
+	return p.store.GetDSLHistoryWithState(ctx, cbuID)
+}
+
+func (p *postgresAdapter) GetDSLByVersion(ctx context.Context, cbuID string, versionNumber int) (*store.DSLVersionWithState, error) {
+	return p.store.GetDSLByVersion(ctx, cbuID, versionNumber)
+}
+
+func (p *postgresAdapter) ListOnboardingSessions(ctx context.Context) ([]store.OnboardingSession, error) {
+	return p.store.ListOnboardingSessions(ctx)
+}
+
 func (p *postgresAdapter) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (json.RawMessage, map[string]any, string, error) {
 	return p.store.ResolveValueFor(ctx, cbuID, attributeID)
 }
@@ -328,4 +371,37 @@ func (m *mockAdapter) SeedCatalog(ctx context.Context) error {
 
 func (m *mockAdapter) InitDB(ctx context.Context) error {
 	return nil // Mock store doesn't need DB initialization
+}
+
+// Enhanced Onboarding State Management for mock adapter
+func (m *mockAdapter) CreateOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error) {
+	return m.store.CreateOnboardingSession(ctx, cbuID)
+}
+
+func (m *mockAdapter) GetOnboardingSession(ctx context.Context, cbuID string) (*store.OnboardingSession, error) {
+	return m.store.GetOnboardingSession(ctx, cbuID)
+}
+
+func (m *mockAdapter) UpdateOnboardingState(ctx context.Context, cbuID string, newState store.OnboardingState, dslVersionID string) error {
+	return m.store.UpdateOnboardingState(ctx, cbuID, newState, dslVersionID)
+}
+
+func (m *mockAdapter) InsertDSLWithState(ctx context.Context, cbuID, dslText string, state store.OnboardingState) (string, error) {
+	return m.store.InsertDSLWithState(ctx, cbuID, dslText, state)
+}
+
+func (m *mockAdapter) GetLatestDSLWithState(ctx context.Context, cbuID string) (*store.DSLVersionWithState, error) {
+	return m.store.GetLatestDSLWithState(ctx, cbuID)
+}
+
+func (m *mockAdapter) GetDSLHistoryWithState(ctx context.Context, cbuID string) ([]store.DSLVersionWithState, error) {
+	return m.store.GetDSLHistoryWithState(ctx, cbuID)
+}
+
+func (m *mockAdapter) GetDSLByVersion(ctx context.Context, cbuID string, versionNumber int) (*store.DSLVersionWithState, error) {
+	return m.store.GetDSLByVersion(ctx, cbuID, versionNumber)
+}
+
+func (m *mockAdapter) ListOnboardingSessions(ctx context.Context) ([]store.OnboardingSession, error) {
+	return m.store.ListOnboardingSessions(ctx)
 }

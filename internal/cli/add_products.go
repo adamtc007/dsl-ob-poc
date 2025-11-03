@@ -41,25 +41,38 @@ func RunAddProducts(ctx context.Context, ds datastore.DataStore, args []string) 
 	}
 	fmt.Printf("Validated %d products against catalog.\n", len(validProducts))
 
-	// 2. Get the *current* state of the DSL from the DB
-	currentDSL, err := ds.GetLatestDSL(ctx, *cbuID)
+	// 2. Get the current onboarding session
+	session, err := ds.GetOnboardingSession(ctx, *cbuID)
+	if err != nil {
+		return fmt.Errorf("failed to get onboarding session for CBU %s: %w", *cbuID, err)
+	}
+
+	// 3. Get the *current* state of the DSL from the DB with state information
+	currentDSLState, err := ds.GetLatestDSLWithState(ctx, *cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to get current case for CBU %s: %w", *cbuID, err)
 	}
 
-	// 3. Pass the current DSL and *validated* products to generate the *new* state
-	newDSL, err := dsl.AddProducts(currentDSL, validProducts)
+	// 4. Pass the current DSL and *validated* products to generate the *new* state
+	newDSL, err := dsl.AddProducts(currentDSLState.DSLText, validProducts)
 	if err != nil {
 		return fmt.Errorf("failed to apply state change: %w", err)
 	}
 
-	// 4. Save the *new* DSL as a new immutable version
-	versionID, err := ds.InsertDSL(ctx, *cbuID, newDSL)
+	// 5. Save the *new* DSL with PRODUCTS_ADDED state
+	versionID, err := ds.InsertDSLWithState(ctx, *cbuID, newDSL, store.StateProductsAdded)
 	if err != nil {
 		return fmt.Errorf("failed to save updated case: %w", err)
 	}
 
-	fmt.Printf("Created new case version (v2): %s\n", versionID)
+	// 6. Update onboarding session state
+	err = ds.UpdateOnboardingState(ctx, *cbuID, store.StateProductsAdded, versionID)
+	if err != nil {
+		return fmt.Errorf("failed to update onboarding state: %w", err)
+	}
+
+	fmt.Printf("🚀 Updated case from %s to %s\n", currentDSLState.OnboardingState, store.StateProductsAdded)
+	fmt.Printf("📝 DSL version (v%d): %s\n", session.CurrentVersion+1, versionID)
 	fmt.Println("---")
 	fmt.Println(newDSL)
 	fmt.Println("---")

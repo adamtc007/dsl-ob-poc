@@ -88,6 +88,42 @@ func run() int {
 
 		err = cli.RunDiscoverKYC(ctx, dataStore, aiAgent, args)
 
+	case "agent-transform":
+		apiKey := os.Getenv("GEMINI_API_KEY")
+		aiAgent, agentErr := agent.NewAgent(ctx, apiKey)
+		if agentErr != nil {
+			log.Printf("Failed to initialize AI agent: %v", agentErr)
+			return 1
+		}
+		if aiAgent == nil {
+			log.Println("Error: GEMINI_API_KEY environment variable is not set.")
+			return 1
+		}
+		defer aiAgent.Close()
+
+		err = cli.RunAgentTransform(ctx, dataStore, aiAgent, args)
+
+	case "agent-validate":
+		apiKey := os.Getenv("GEMINI_API_KEY")
+		aiAgent, agentErr := agent.NewAgent(ctx, apiKey)
+		if agentErr != nil {
+			log.Printf("Failed to initialize AI agent: %v", agentErr)
+			return 1
+		}
+		if aiAgent == nil {
+			log.Println("Error: GEMINI_API_KEY environment variable is not set.")
+			return 1
+		}
+		defer aiAgent.Close()
+
+		err = cli.RunAgentValidate(ctx, dataStore, aiAgent, args)
+
+	case "agent-demo":
+		err = cli.RunAgentDemo(ctx, dataStore, args)
+
+	case "agent-test":
+		err = cli.RunAgentTest(ctx, dataStore, args)
+
 	case "discover-services":
 		err = cli.RunDiscoverServices(ctx, dataStore, args)
 
@@ -165,6 +201,13 @@ func printUsage() {
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v5) Discovers and appends resources plan.")
 	fmt.Println("  populate-attributes --cbu=<cbu-id> (v6) Populates attribute values from runtime sources.")
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v7) Resolves and binds attribute values deterministically.")
+	fmt.Println("\nAI Agent Commands (requires GEMINI_API_KEY):")
+	fmt.Println("  agent-transform --cbu=<cbu-id>   AI-powered DSL transformation with natural language instructions")
+	fmt.Println("                  --instruction=<text> [--target-state=<state>] [--save]")
+	fmt.Println("  agent-validate --cbu=<cbu-id>    AI-powered DSL validation and improvement suggestions")
+	fmt.Println("  agent-demo [--cbu=<cbu-id>]      Demonstrates AI agent capabilities (no API key required)")
+	fmt.Println("  agent-test [--cbu=<cbu-id>]      Tests AI agents with mock responses (no API key required)")
+	fmt.Println("             [--type=<kyc|transform|validate|all>]")
 	fmt.Println("\nCBU Management Commands:")
 	fmt.Println("  cbu-create --name=<name> [--description=<desc>] [--nature-purpose=<purpose>]")
 	fmt.Println("  cbu-list                     Lists all CBUs")
