@@ -196,6 +196,8 @@ func run() int {
 	// HEDGE FUND INVESTOR COMMANDS
 	case "hf-create-investor":
 		err = cli.RunHFCreateInvestor(ctx, dataStore, args)
+	case "hf-amend-investor":
+		err = cli.RunHFAmendInvestor(ctx, dataStore, args)
 	case "hf-record-indication":
 		err = cli.RunHFRecordIndication(ctx, dataStore, args)
 	case "hf-begin-kyc":

@@ -56,13 +56,36 @@ func GetHedgeFundDSLVocabulary() *HedgeFundDSLVocab {
 				Args: map[string]HedgeFundArgSpec{
 					"legal-name": {Type: "string", Required: true, Description: "Legal name of the investor"},
 					"type":       {Type: "enum", Required: true, Description: "Investor type", Values: []string{"INDIVIDUAL", "CORPORATE", "TRUST", "FOHF", "NOMINEE"}},
-					"domicile":   {Type: "string", Required: true, Description: "Investor domicile jurisdiction"},
+					"domicile":   {Type: "string", Required: false, Description: "Investor domicile jurisdiction"},
 					"source":     {Type: "string", Required: false, Description: "Source of the investor lead"},
 				},
 				StateChange: &HedgeFundStateTransition{
 					FromStates: []string{},
 					ToState:    "OPPORTUNITY",
 				},
+			},
+			"investor.amend-details": {
+				Name:        "investor.amend-details",
+				Domain:      "hedge-fund-investor",
+				Category:    "investor-management",
+				Description: "Amend investor details (domicile, legal name, contact info, etc.)",
+				Args: map[string]HedgeFundArgSpec{
+					"investor":      {Type: "uuid", Required: true, Description: "Investor ID"},
+					"legal-name":    {Type: "string", Required: false, Description: "Updated legal name"},
+					"short-name":    {Type: "string", Required: false, Description: "Updated short name"},
+					"domicile":      {Type: "string", Required: false, Description: "Updated domicile jurisdiction"},
+					"lei":           {Type: "string", Required: false, Description: "Updated Legal Entity Identifier"},
+					"reg-number":    {Type: "string", Required: false, Description: "Updated registration number"},
+					"address-line1": {Type: "string", Required: false, Description: "Updated address line 1"},
+					"address-line2": {Type: "string", Required: false, Description: "Updated address line 2"},
+					"city":          {Type: "string", Required: false, Description: "Updated city"},
+					"country":       {Type: "string", Required: false, Description: "Updated country"},
+					"postal-code":   {Type: "string", Required: false, Description: "Updated postal code"},
+					"contact-name":  {Type: "string", Required: false, Description: "Updated primary contact name"},
+					"contact-email": {Type: "string", Required: false, Description: "Updated primary contact email"},
+					"contact-phone": {Type: "string", Required: false, Description: "Updated primary contact phone"},
+				},
+				// No state change - can be called at any time
 			},
 			"investor.record-indication": {
 				Name:        "investor.record-indication",

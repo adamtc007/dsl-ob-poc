@@ -21,7 +21,7 @@ func RunHFCreateInvestor(ctx context.Context, ds datastore.DataStore, args []str
 	investorCode := fs.String("code", "", "Investor code (e.g., INV-001) (required)")
 	legalName := fs.String("legal-name", "", "Legal name of the investor (required)")
 	investorType := fs.String("type", "", "Investor type: INDIVIDUAL, CORPORATE, TRUST, FOHF, NOMINEE, PENSION_FUND, INSURANCE_CO (required)")
-	domicile := fs.String("domicile", "", "Investor domicile (2-letter country code) (required)")
+	domicile := fs.String("domicile", "", "Investor domicile (2-letter country code) (optional)")
 
 	// Optional flags
 	shortName := fs.String("short-name", "", "Short name for the investor")
@@ -46,9 +46,9 @@ func RunHFCreateInvestor(ctx context.Context, ds datastore.DataStore, args []str
 	}
 
 	// Validate required fields
-	if *investorCode == "" || *legalName == "" || *investorType == "" || *domicile == "" {
+	if *investorCode == "" || *legalName == "" || *investorType == "" {
 		fs.Usage()
-		return fmt.Errorf("error: --code, --legal-name, --type, and --domicile flags are required")
+		return fmt.Errorf("error: --code, --legal-name, and --type flags are required")
 	}
 
 	// Validate investor type
@@ -62,13 +62,15 @@ func RunHFCreateInvestor(ctx context.Context, ds datastore.DataStore, args []str
 		InvestorCode: *investorCode,
 		Type:         *investorType,
 		LegalName:    *legalName,
-		Domicile:     *domicile,
 		Status:       domain.InvestorStatusOpportunity,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
 	}
 
 	// Set optional fields
+	if *domicile != "" {
+		investor.Domicile = *domicile
+	}
 	if *shortName != "" {
 		investor.ShortName = shortName
 	}
@@ -112,11 +114,13 @@ func RunHFCreateInvestor(ctx context.Context, ds datastore.DataStore, args []str
 		Args: map[string]interface{}{
 			"legal-name": *legalName,
 			"type":       *investorType,
-			"domicile":   *domicile,
 		},
 		Timestamp: time.Now().UTC(),
 	}
 
+	if *domicile != "" {
+		operation.Args["domicile"] = *domicile
+	}
 	if *source != "" {
 		operation.Args["source"] = *source
 	}
@@ -133,7 +137,9 @@ func RunHFCreateInvestor(ctx context.Context, ds datastore.DataStore, args []str
 	fmt.Printf("  Investor Code: %s\n", investor.InvestorCode)
 	fmt.Printf("  Legal Name: %s\n", investor.LegalName)
 	fmt.Printf("  Type: %s\n", investor.Type)
-	fmt.Printf("  Domicile: %s\n", investor.Domicile)
+	if investor.Domicile != "" {
+		fmt.Printf("  Domicile: %s\n", investor.Domicile)
+	}
 	fmt.Printf("  Status: %s\n", investor.Status)
 	fmt.Printf("\nGenerated DSL:\n%s\n", dslText)
 
