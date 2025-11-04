@@ -1,10 +1,14 @@
-.PHONY: build build-greenteagc clean install-deps init-db help lint fmt vet test test-coverage check
+.PHONY: build build-greenteagc clean install-deps init-db help lint fmt vet test test-coverage check validate validate-bad
 
 # Default Go variables
 GO := go
 GOFLAGS := -v
 OUTPUT := dsl-poc
 GOLANGCI_LINT := golangci-lint
+
+# Default files (override via: make validate FILE=... or make validate-bad BAD_FILE=...)
+FILE ?= examples/runbook.sample.json
+BAD_FILE ?= examples/bad.runbook.json
 
 help:
 	@echo "Available targets:"
@@ -30,6 +34,10 @@ help:
 	@echo "  make migrate-schema     - Rename schema kyc-dsl -> dsl-ob-poc (requires DB_CONN_STRING)"
 	@echo "  make verify-db          - Verify schema/tables exist (uses DB or DB_CONN_STRING)"
 	@echo ""
+	@echo "Hedge Fund DSL targets:"
+	@echo "  make validate [FILE=examples/runbook.sample.json]      - Validate a good DSL runbook"
+	@echo "  make validate-bad [BAD_FILE=examples/bad.runbook.json] - Intentionally validate a bad runbook (non-zero exit)"
+	@echo ""
 	@echo "Environment variables:"
 	@echo "  DB_CONN_STRING - PostgreSQL connection string (required for init-db)"
 	@echo ""
@@ -38,6 +46,10 @@ help:
 	@echo "  make check              # Check code quality"
 	@echo "  make build-greenteagc   # Build with greenteagc"
 	@echo "  make init-db            # Initialize database"
+	@echo "  make validate           # Validate sample runbook"
+	@echo "  make validate FILE=/tmp/runbook.json  # Validate custom file"
+	@echo "  make validate-bad       # Test validation with bad runbook"
+	@echo "  make -k validate-bad    # Continue after failure to observe the error"
 	@echo "  ./dsl-poc create --cbu=\"CBU-1234\""
 
 build: install-deps
@@ -123,3 +135,12 @@ run: build-greenteagc
 # Development workflow
 dev: check build-greenteagc
 	@echo "Development build complete!"
+
+# Hedge Fund DSL validation
+validate:
+	@echo "Validating $(FILE) ..."
+	@$(GO) run ./cmd/hf-cli dsl-validate -pretty < $(FILE)
+
+validate-bad:
+	@echo "Intentionally validating a bad runbook: $(BAD_FILE)"
+	@$(GO) run ./cmd/hf-cli dsl-validate < $(BAD_FILE)

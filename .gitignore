@@ -2,6 +2,7 @@
 # Go build artifacts & bins
 ############################
 /dsl-poc
+test-build
 *.exe
 *.dll
 *.so
