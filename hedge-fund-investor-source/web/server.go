@@ -161,11 +161,49 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update session context with state transition
+	// Update session context with state transition and entity references
 	session.Context.CurrentState = response.ToState
+
+	// Extract and store investor context
 	if response.Parameters["investor"] != nil {
 		if investorID, ok := response.Parameters["investor"].(string); ok {
 			session.Context.InvestorID = investorID
+		}
+	}
+
+	// For new investor creation, capture all details
+	if response.Verb == "investor.start-opportunity" {
+		if legalName, ok := response.Parameters["legal-name"].(string); ok {
+			session.Context.InvestorName = legalName
+		}
+		if investorType, ok := response.Parameters["type"].(string); ok {
+			session.Context.InvestorType = investorType
+		}
+		if domicile, ok := response.Parameters["domicile"].(string); ok {
+			session.Context.Domicile = domicile
+		}
+		// Generate a UUID for this new investor if not already set
+		if session.Context.InvestorID == "" {
+			session.Context.InvestorID = uuid.New().String()
+			// Add the generated UUID back to response parameters
+			response.Parameters["investor"] = session.Context.InvestorID
+		}
+	}
+
+	// Track fund/class/series context
+	if response.Parameters["fund"] != nil {
+		if fundID, ok := response.Parameters["fund"].(string); ok {
+			session.Context.FundID = fundID
+		}
+	}
+	if response.Parameters["class"] != nil {
+		if classID, ok := response.Parameters["class"].(string); ok {
+			session.Context.ClassID = classID
+		}
+	}
+	if response.Parameters["series"] != nil {
+		if seriesID, ok := response.Parameters["series"].(string); ok {
+			session.Context.SeriesID = seriesID
 		}
 	}
 
