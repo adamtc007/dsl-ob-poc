@@ -429,3 +429,9 @@ func RunHFSubscribeRequest(ctx context.Context, ds datastore.DataStore, args []s
 
 	return nil
 }
+
+// RunHFAmendInvestorDetails handles the 'hf-amend-investor' command for updating investor details
+func RunHFAmendInvestorDetails(ctx context.Context, ds datastore.DataStore, args []string) error {
+	fs := flag.NewFlagSet("hf-amend-investor", flag.ExitOnError)
+
+	// Require

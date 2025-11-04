@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"dsl-ob-poc/hedge-fund-investor-source/web/internal/datastore"
+	"dsl-ob-poc/hedge-fund-investor-source/web/internal/dslstate"
 	hfagent "dsl-ob-poc/hedge-fund-investor-source/web/internal/hf-agent"
 )
 
@@ -28,13 +29,13 @@ type Server struct {
 	upgrader websocket.Upgrader
 }
 
-// ChatSession represents a user's chat session with context
+// ChatSession represents a user's chat session with DSL state manager
 type ChatSession struct {
-	SessionID string
-	Context   hfagent.DSLGenerationRequest
-	History   []ChatMessage
-	CreatedAt time.Time
-	LastUsed  time.Time
+	SessionID  string
+	DSLManager *dslstate.Manager // Single source of truth for DSL state
+	History    []ChatMessage
+	CreatedAt  time.Time
+	LastUsed   time.Time
 }
 
 // ChatMessage represents a single message in the chat
@@ -126,7 +127,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.respondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -141,88 +142,31 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	session.History = append(session.History, userMsg)
 
-	// Update context with any provided context
-	if req.Context != nil {
-		if investorID, ok := req.Context["investor_id"].(string); ok {
-			session.Context.InvestorID = investorID
-		}
-		if state, ok := req.Context["current_state"].(string); ok {
-			session.Context.CurrentState = state
-		}
-	}
-
-	// Generate DSL using the agent
-	session.Context.Instruction = req.Message
 	ctx := r.Context()
 
-	response, err := s.agent.GenerateDSL(ctx, session.Context)
+	// THIS IS THE SINGLE PLACE DSL STATE IS UPDATED
+	completeDSL, fragment, response, err := session.DSLManager.AppendOperation(ctx, req.Message)
 	if err != nil {
 		s.respondError(w, fmt.Sprintf("Failed to generate DSL: %v", err), http.StatusInternalServerError)
 		return
-	}
-
-	// Update session context with state transition and entity references
-	session.Context.CurrentState = response.ToState
-
-	// Extract and store investor context
-	if response.Parameters["investor"] != nil {
-		if investorID, ok := response.Parameters["investor"].(string); ok {
-			session.Context.InvestorID = investorID
-		}
-	}
-
-	// For new investor creation, capture all details
-	if response.Verb == "investor.start-opportunity" {
-		if legalName, ok := response.Parameters["legal-name"].(string); ok {
-			session.Context.InvestorName = legalName
-		}
-		if investorType, ok := response.Parameters["type"].(string); ok {
-			session.Context.InvestorType = investorType
-		}
-		if domicile, ok := response.Parameters["domicile"].(string); ok {
-			session.Context.Domicile = domicile
-		}
-		// Generate a UUID for this new investor if not already set
-		if session.Context.InvestorID == "" {
-			session.Context.InvestorID = uuid.New().String()
-			// Add the generated UUID back to response parameters
-			response.Parameters["investor"] = session.Context.InvestorID
-		}
-	}
-
-	// Track fund/class/series context
-	if response.Parameters["fund"] != nil {
-		if fundID, ok := response.Parameters["fund"].(string); ok {
-			session.Context.FundID = fundID
-		}
-	}
-	if response.Parameters["class"] != nil {
-		if classID, ok := response.Parameters["class"].(string); ok {
-			session.Context.ClassID = classID
-		}
-	}
-	if response.Parameters["series"] != nil {
-		if seriesID, ok := response.Parameters["series"].(string); ok {
-			session.Context.SeriesID = seriesID
-		}
 	}
 
 	// Add agent response to history
 	agentMsg := ChatMessage{
 		Role:      "agent",
 		Content:   response.Explanation,
-		DSL:       response.DSL,
+		DSL:       fragment, // Store the individual fragment in history
 		Response:  response,
 		Timestamp: time.Now().UTC(),
 	}
 	session.History = append(session.History, agentMsg)
 	session.LastUsed = time.Now().UTC()
 
-	// Send response
+	// Send response with complete accumulated DSL
 	chatResp := ChatResponse{
 		SessionID: session.SessionID,
 		Message:   response.Explanation,
-		DSL:       response.DSL,
+		DSL:       completeDSL, // The complete accumulated DSL state
 		Response:  response,
 	}
 
@@ -418,26 +362,24 @@ func (s *Server) handleWebSocketMessage(conn *websocket.Conn, session *ChatSessi
 			return
 		}
 
-		// Generate DSL
-		session.Context.Instruction = chatReq.Message
+		// Use DSL Manager to update state
 		ctx := context.Background()
-
-		response, err := s.agent.GenerateDSL(ctx, session.Context)
+		completeDSL, fragment, response, err := session.DSLManager.AppendOperation(ctx, chatReq.Message)
 		if err != nil {
 			s.sendWSError(conn, fmt.Sprintf("Failed to generate DSL: %v", err))
 			return
 		}
 
 		// Update session
-		session.Context.CurrentState = response.ToState
 		session.LastUsed = time.Now().UTC()
 
-		// Send response
+		// Send response with complete accumulated DSL
 		conn.WriteJSON(map[string]interface{}{
 			"type": "chat_response",
 			"payload": map[string]interface{}{
 				"message":  response.Explanation,
-				"dsl":      response.DSL,
+				"dsl":      completeDSL, // Send complete accumulated DSL
+				"fragment": fragment,    // Individual operation
 				"verb":     response.Verb,
 				"state":    response.ToState,
 				"response": response,
@@ -473,20 +415,19 @@ func (s *Server) getOrCreateSession(sessionID string) *ChatSession {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if sessionID == "" {
-		sessionID = uuid.New().String()
-	}
-
 	session, exists := s.sessions[sessionID]
 	if !exists {
+		// Wrap agent in adapter to use new DSLAgent interface
+		agentAdapter := dslstate.NewHedgeFundAgentAdapter(s.agent)
 		session = &ChatSession{
-			SessionID: sessionID,
-			Context:   hfagent.DSLGenerationRequest{},
-			History:   []ChatMessage{},
-			CreatedAt: time.Now().UTC(),
-			LastUsed:  time.Now().UTC(),
+			SessionID:  sessionID,
+			DSLManager: dslstate.NewManager(agentAdapter),
+			History:    []ChatMessage{},
+			CreatedAt:  time.Now().UTC(),
+			LastUsed:   time.Now().UTC(),
 		}
 		s.sessions[sessionID] = session
+		log.Printf("Created new session: %s", sessionID)
 	}
 
 	return session

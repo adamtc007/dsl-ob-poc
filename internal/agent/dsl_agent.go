@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/google/generative-ai-go/genai"
@@ -35,13 +36,25 @@ func (a *Agent) CallDSLTransformationAgent(ctx context.Context, request DSLTrans
 	systemPrompt := `You are an expert DSL (Domain Specific Language) architect for financial onboarding workflows.
 Your role is to analyze existing DSL and transform it according to user instructions while maintaining correctness and consistency.
 
+APPROVED DSL VERBS (MUST USE ONLY THESE):
+- case.create, case.update, case.validate, case.approve, case.close
+- entity.register, entity.classify, entity.link, identity.verify, identity.attest
+- products.add, products.configure, services.discover, services.provision, services.activate
+- kyc.start, kyc.collect, kyc.verify, kyc.assess, compliance.screen, compliance.monitor
+- resources.plan, resources.provision, resources.configure, resources.test, resources.deploy
+- attributes.define, attributes.resolve, values.bind, values.validate, values.encrypt
+- workflow.transition, workflow.gate, tasks.create, tasks.assign, tasks.complete
+- notify.send, communicate.request, escalate.trigger, audit.log
+- external.query, external.sync, api.call, webhook.register
+
 RULES:
-1. Analyze the current DSL structure and understand its semantic meaning
-2. Apply the requested transformation while preserving DSL syntax and structure
-3. Ensure all changes are consistent with the target onboarding state
-4. Provide clear explanations for all changes made
-5. Respond ONLY with a single, well-formed JSON object
-6. Do not include markdown, code blocks, or conversational text
+1. ONLY use verbs from the approved vocabulary listed above
+2. Analyze the current DSL structure and understand its semantic meaning
+3. Apply the requested transformation while preserving DSL syntax and structure
+4. Ensure all changes are consistent with the target onboarding state
+5. Provide clear explanations for all changes made
+6. Respond ONLY with a single, well-formed JSON object
+7. Do not include markdown, code blocks, or conversational text
 
 DSL SYNTAX GUIDE:
 - S-expressions format: (command args...)
@@ -105,6 +118,11 @@ Please transform the DSL according to the instruction while moving toward the ta
 	var transformResp DSLTransformationResponse
 	if uErr := json.Unmarshal([]byte(cleanedJSON), &transformResp); uErr != nil {
 		return nil, fmt.Errorf("failed to parse agent's JSON response: %w (cleaned response was: %s)", uErr, cleanedJSON)
+	}
+
+	// Validate that only approved DSL verbs are used
+	if err := validateDSLVerbs(transformResp.NewDSL); err != nil {
+		return nil, fmt.Errorf("DSL validation failed: %w", err)
 	}
 
 	return &transformResp, nil
@@ -238,4 +256,122 @@ func cleanJSONResponse(response string) string {
 
 	// Return original if we can't clean it
 	return response
+}
+
+// validateDSLVerbs checks that the DSL only uses approved verbs from the vocabulary
+func validateDSLVerbs(dsl string) error {
+	// Approved DSL verbs based on vocab.go
+	approvedVerbs := map[string]bool{
+		// Case Management
+		"case.create":   true,
+		"case.update":   true,
+		"case.validate": true,
+		"case.approve":  true,
+		"case.close":    true,
+		// Entity Identity
+		"entity.register": true,
+		"entity.classify": true,
+		"entity.link":     true,
+		"identity.verify": true,
+		"identity.attest": true,
+		// Product Service
+		"products.add":       true,
+		"products.configure": true,
+		"services.discover":  true,
+		"services.provision": true,
+		"services.activate":  true,
+		// KYC Compliance
+		"kyc.start":          true,
+		"kyc.collect":        true,
+		"kyc.verify":         true,
+		"kyc.assess":         true,
+		"compliance.screen":  true,
+		"compliance.monitor": true,
+		// Resource Infrastructure
+		"resources.plan":      true,
+		"resources.provision": true,
+		"resources.configure": true,
+		"resources.test":      true,
+		"resources.deploy":    true,
+		// Attribute Data
+		"attributes.define":  true,
+		"attributes.resolve": true,
+		"values.bind":        true,
+		"values.validate":    true,
+		"values.encrypt":     true,
+		// Workflow State
+		"workflow.transition": true,
+		"workflow.gate":       true,
+		"tasks.create":        true,
+		"tasks.assign":        true,
+		"tasks.complete":      true,
+		// Notification Communication
+		"notify.send":         true,
+		"communicate.request": true,
+		"escalate.trigger":    true,
+		"audit.log":           true,
+		// Integration External
+		"external.query":   true,
+		"external.sync":    true,
+		"api.call":         true,
+		"webhook.register": true,
+		// Temporal Scheduling
+		"schedule.create":   true,
+		"deadline.set":      true,
+		"reminder.schedule": true,
+		// Risk Monitoring
+		"risk.assess":   true,
+		"monitor.setup": true,
+		"alert.trigger": true,
+		// Data Lifecycle
+		"data.collect":   true,
+		"data.transform": true,
+		"data.archive":   true,
+		"data.purge":     true,
+	}
+
+	// Extract all verbs from the DSL using regex
+	// Only match verbs at the START of an s-expression: (verb ...
+	// This avoids matching parameter names like (attr-id ...) or (nature-purpose ...)
+	verbPattern := regexp.MustCompile(`\(([a-z]+\.[a-z][a-z-]*)\s`)
+	matches := verbPattern.FindAllStringSubmatch(dsl, -1)
+
+	var unapprovedVerbs []string
+	seen := make(map[string]bool) // Track seen verbs to avoid duplicates
+
+	for _, match := range matches {
+		if len(match) > 1 {
+			verb := match[1]
+
+			// Skip if already processed
+			if seen[verb] {
+				continue
+			}
+			seen[verb] = true
+
+			// Skip non-verb constructs (parameters, attributes, etc.)
+			// These appear inside s-expressions but aren't verbs themselves
+			if strings.HasSuffix(verb, ".id") ||
+				verb == "for.product" ||
+				verb == "resource.create" ||
+				verb == "attr.id" ||
+				strings.Contains(verb, "condition.") ||
+				strings.Contains(verb, "document.") ||
+				strings.Contains(verb, "task.") ||
+				strings.Contains(verb, "result.") ||
+				strings.Contains(verb, "system.") {
+				continue
+			}
+
+			if !approvedVerbs[verb] {
+				unapprovedVerbs = append(unapprovedVerbs, verb)
+			}
+		}
+	}
+
+	if len(unapprovedVerbs) > 0 {
+		return fmt.Errorf("unapproved DSL verbs detected: %v (only approved vocabulary verbs are allowed)", unapprovedVerbs)
+	}
+
+	return nil
 }

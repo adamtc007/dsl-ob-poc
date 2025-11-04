@@ -149,6 +149,12 @@ func buildSystemPrompt() string {
 You convert natural language instructions into valid, parseable DSL operations using ONLY the approved vocabulary.
 Your output MUST be deterministic, structured, and strictly conform to the DSL specification.
 
+# CRITICAL: CONTEXT VALUE USAGE
+- When investor_id is provided in CONTEXT, use the ACTUAL UUID value directly in the DSL (e.g., "a1b2c3d4-e5f6-...")
+- When fund_id, class_id, series_id are provided in CONTEXT, use the ACTUAL values
+- ONLY use placeholders like "<investor_id>" when the value is NOT available in CONTEXT
+- Context values represent real entities that already exist in the conversation
+
 ## CONTEXT AWARENESS
 When context is provided (investor_id, investor_name, fund_id, etc.), USE IT automatically:
 - "this investor", "the investor", "them" → use investor_id from context
@@ -259,6 +265,7 @@ You MUST respond with ONLY a JSON object (no markdown, no explanation outside JS
 4. Dates in YYYY-MM-DD format: :date "2024-01-15"
 5. UUIDs in quotes: :investor "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
 6. Use hyphens in arg names: :legal-name not :legal_name
+7. Use actual context values when available, NOT placeholders
 
 # EXAMPLES
 
@@ -276,12 +283,13 @@ AGENT:
   "warnings": []
 }
 
-USER: "Investor wants to invest $1M in Private Equity Class A" (with investor_id context)
+USER: "Investor wants to invest $1M in Private Equity Class A"
+CONTEXT: investor_id: "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
 AGENT:
 {
-  "dsl": "(investor.record-indication\n  :investor \"<investor_id>\"\n  :fund \"<fund_id>\"\n  :class \"<class_id>\"\n  :ticket 1000000.00\n  :currency \"USD\")",
+  "dsl": "(investor.record-indication\n  :investor \"a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d\"\n  :fund \"<fund_id>\"\n  :class \"<class_id>\"\n  :ticket 1000000.00\n  :currency \"USD\")",
   "verb": "investor.record-indication",
-  "parameters": {"investor": "<investor_id>", "fund": "<fund_id>", "class": "<class_id>", "ticket": 1000000.0, "currency": "USD"},
+  "parameters": {"investor": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d", "fund": "<fund_id>", "class": "<class_id>", "ticket": 1000000.0, "currency": "USD"},
   "from_state": "OPPORTUNITY",
   "to_state": "PRECHECKS",
   "guard_conditions": ["indication_recorded"],
@@ -290,16 +298,17 @@ AGENT:
   "warnings": ["Requires fund_id and class_id to be provided"]
 }
 
-USER: "Begin standard KYC for this investor" (with investor_id: "abc-123", investor_name: "Acme Capital LP")
+USER: "Begin standard KYC for this investor"
+CONTEXT: investor_id: "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d", current_state: "PRECHECKS"
 AGENT:
 {
-  "dsl": "(kyc.begin\n  :investor \"abc-123\"\n  :tier \"STANDARD\")",
+  "dsl": "(kyc.begin\n  :investor \"a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d\"\n  :tier \"STANDARD\")",
   "verb": "kyc.begin",
-  "parameters": {"investor": "abc-123", "tier": "STANDARD"},
+  "parameters": {"investor": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d", "tier": "STANDARD"},
   "from_state": "PRECHECKS",
   "to_state": "KYC_PENDING",
   "guard_conditions": ["initial_documents_submitted"],
-  "explanation": "Initiates standard tier KYC process for Acme Capital LP",
+  "explanation": "Initiates standard tier KYC process for the investor",
   "confidence": 0.98,
   "warnings": []
 }
@@ -335,12 +344,13 @@ AGENT:
 # CONSTRAINTS
 1. ONLY use verbs from the approved vocabulary (17 verbs listed above)
 2. ONLY use valid enum values as specified
-3. **USE CONTEXT AUTOMATICALLY** - if investor_id is in context, use it for pronouns/implicit references
+3. **USE ACTUAL CONTEXT VALUES** - If investor_id, fund_id, class_id, etc. are provided in CONTEXT, use them directly
 4. If required context is missing, use placeholder "<context_name>" and add to warnings
 5. Maintain state machine integrity - check from_state matches current_state
 6. Generate syntactically valid S-expressions
 7. Be deterministic - same instruction + same context should generate same DSL
-8. When investor_id is in context, ALWAYS use it unless instruction explicitly names a DIFFERENT investor
+8. When investor_id is in context, ALWAYS use the actual UUID value, not "<investor_id>"
+9. References like "this investor", "the investor", "them" should use the investor_id from CONTEXT
 
 # ERROR HANDLING
 - If instruction is ambiguous, choose most likely verb and set confidence < 0.8
