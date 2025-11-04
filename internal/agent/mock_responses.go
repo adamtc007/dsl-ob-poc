@@ -25,24 +25,25 @@ func (m *MockAgent) CallKYCAgent(ctx context.Context, naturePurpose string, prod
 	// Analyze nature/purpose for entity type and domicile
 	natureLower := strings.ToLower(naturePurpose)
 
-	if strings.Contains(natureLower, "ucits") {
+	switch {
+	case strings.Contains(natureLower, "ucits"):
 		docs = append(docs, "CertificateOfIncorporation", "ArticlesOfAssociation", "W8BEN-E")
 		if strings.Contains(natureLower, "lu") {
 			jurisdictions = append(jurisdictions, "LU")
 		} else {
 			jurisdictions = append(jurisdictions, "EU")
 		}
-	} else if strings.Contains(natureLower, "hedge fund") {
+	case strings.Contains(natureLower, "hedge fund"):
 		docs = append(docs, "CertificateOfLimitedPartnership", "PartnershipAgreement", "W9", "AMLPolicy")
 		if strings.Contains(natureLower, "us") {
 			jurisdictions = append(jurisdictions, "US")
 		} else {
 			jurisdictions = append(jurisdictions, "US", "CAYMAN")
 		}
-	} else if strings.Contains(natureLower, "corporation") || strings.Contains(natureLower, "company") {
+	case strings.Contains(natureLower, "corporation") || strings.Contains(natureLower, "company"):
 		docs = append(docs, "CertificateOfIncorporation", "ArticlesOfAssociation")
 		jurisdictions = append(jurisdictions, "US")
-	} else {
+	default:
 		// Default requirements
 		docs = append(docs, "CertificateOfIncorporation", "ArticlesOfAssociation", "W8BEN-E")
 		jurisdictions = append(jurisdictions, "US")
@@ -77,15 +78,16 @@ func (m *MockAgent) CallDSLTransformationAgent(ctx context.Context, request DSLT
 	instruction := strings.ToLower(request.Instruction)
 
 	// Simulate intelligent transformations based on instruction
-	if strings.Contains(instruction, "add") && strings.Contains(instruction, "product") {
+	switch {
+	case strings.Contains(instruction, "add") && strings.Contains(instruction, "product"):
 		return m.simulateAddProduct(request)
-	} else if strings.Contains(instruction, "add") && strings.Contains(instruction, "jurisdiction") {
+	case strings.Contains(instruction, "add") && strings.Contains(instruction, "jurisdiction"):
 		return m.simulateAddJurisdiction(request)
-	} else if strings.Contains(instruction, "add") && strings.Contains(instruction, "document") {
+	case strings.Contains(instruction, "add") && strings.Contains(instruction, "document"):
 		return m.simulateAddDocument(request)
-	} else if strings.Contains(instruction, "change") && strings.Contains(instruction, "nature") {
+	case strings.Contains(instruction, "change") && strings.Contains(instruction, "nature"):
 		return m.simulateChangeNature(request)
-	} else {
+	default:
 		return m.simulateGenericTransformation(request)
 	}
 }

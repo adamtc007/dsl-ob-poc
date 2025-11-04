@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dsl-ob-poc/internal/dictionary"
+
 	_ "github.com/lib/pq"
 )
 
@@ -484,20 +485,21 @@ func (s *Store) GetDSLHistory(ctx context.Context, cbuID string) ([]DSLVersion, 
 	return history, nil
 }
 
-// GetDictionaryAttributeByName retrieves an attribute from the dictionary by name
-func (s *Store) GetDictionaryAttributeByName(ctx context.Context, name string) (*dictionary.Attribute, error) {
+// getDictionaryAttribute is a helper function to retrieve an attribute with a specific WHERE clause
+func (s *Store) getDictionaryAttribute(ctx context.Context, whereClause string, param interface{}, notFoundMsg string) (*dictionary.Attribute, error) {
 	var attr dictionary.Attribute
 	var sourceJSON, sinkJSON string
 
-	err := s.db.QueryRowContext(ctx,
-		`SELECT attribute_id, name, long_description, group_id, mask, domain,
-		        COALESCE(vector, ''), COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
-		 FROM "dsl-ob-poc".dictionary WHERE name = $1`,
-		name).Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription, &attr.GroupID,
+	query := `SELECT attribute_id, name, long_description, group_id, mask, domain,
+	                 COALESCE(vector, ''), COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
+	          FROM "dsl-ob-poc".dictionary WHERE ` + whereClause
+
+	err := s.db.QueryRowContext(ctx, query, param).Scan(
+		&attr.AttributeID, &attr.Name, &attr.LongDescription, &attr.GroupID,
 		&attr.Mask, &attr.Domain, &attr.Vector, &sourceJSON, &sinkJSON)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("attribute '%s' not found in dictionary", name)
+		return nil, fmt.Errorf(notFoundMsg, param)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get attribute: %w", err)
@@ -514,34 +516,14 @@ func (s *Store) GetDictionaryAttributeByName(ctx context.Context, name string) (
 	return &attr, nil
 }
 
+// GetDictionaryAttributeByName retrieves an attribute from the dictionary by name
+func (s *Store) GetDictionaryAttributeByName(ctx context.Context, name string) (*dictionary.Attribute, error) {
+	return s.getDictionaryAttribute(ctx, "name = $1", name, "attribute '%s' not found in dictionary")
+}
+
 // GetDictionaryAttributeByID retrieves an attribute from the dictionary by UUID
 func (s *Store) GetDictionaryAttributeByID(ctx context.Context, id string) (*dictionary.Attribute, error) {
-	var attr dictionary.Attribute
-	var sourceJSON, sinkJSON string
-
-	err := s.db.QueryRowContext(ctx,
-		`SELECT attribute_id, name, long_description, group_id, mask, domain,
-		        COALESCE(vector, ''), COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
-		 FROM "dsl-ob-poc".dictionary WHERE attribute_id = $1`,
-		id).Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription, &attr.GroupID,
-		&attr.Mask, &attr.Domain, &attr.Vector, &sourceJSON, &sinkJSON)
-
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("attribute with ID '%s' not found in dictionary", id)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get attribute: %w", err)
-	}
-
-	// Parse JSON metadata
-	if parseErr := json.Unmarshal([]byte(sourceJSON), &attr.Source); parseErr != nil {
-		return nil, fmt.Errorf("failed to parse source metadata: %w", parseErr)
-	}
-	if parseErr := json.Unmarshal([]byte(sinkJSON), &attr.Sink); parseErr != nil {
-		return nil, fmt.Errorf("failed to parse sink metadata: %w", parseErr)
-	}
-
-	return &attr, nil
+	return s.getDictionaryAttribute(ctx, "attribute_id = $1", id, "attribute with ID '%s' not found in dictionary")
 }
 
 // GetCBUByName retrieves a CBU by name from the catalog
@@ -560,7 +542,7 @@ func (s *Store) GetCBUByName(ctx context.Context, name string) (*CBU, error) {
 }
 
 // ResolveValueFor resolves attribute values using source metadata
-func (s *Store) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (json.RawMessage, map[string]any, string, error) {
+func (s *Store) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (payload json.RawMessage, provenance map[string]any, status string, err error) {
 	a, err := s.GetDictionaryAttributeByID(ctx, attributeID)
 	if err != nil {
 		return nil, nil, "", err

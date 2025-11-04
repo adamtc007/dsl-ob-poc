@@ -11,24 +11,24 @@ import (
 type OnboardingState string
 
 const (
-	StateCreated               OnboardingState = "CREATED"
-	StateProductsAdded         OnboardingState = "PRODUCTS_ADDED"
-	StateKYCDiscovered         OnboardingState = "KYC_DISCOVERED"
-	StateServicesDiscovered    OnboardingState = "SERVICES_DISCOVERED"
-	StateResourcesDiscovered   OnboardingState = "RESOURCES_DISCOVERED"
-	StateAttributesPopulated   OnboardingState = "ATTRIBUTES_POPULATED"
-	StateCompleted             OnboardingState = "COMPLETED"
+	StateCreated             OnboardingState = "CREATED"
+	StateProductsAdded       OnboardingState = "PRODUCTS_ADDED"
+	StateKYCDiscovered       OnboardingState = "KYC_DISCOVERED"
+	StateServicesDiscovered  OnboardingState = "SERVICES_DISCOVERED"
+	StateResourcesDiscovered OnboardingState = "RESOURCES_DISCOVERED"
+	StateAttributesPopulated OnboardingState = "ATTRIBUTES_POPULATED"
+	StateCompleted           OnboardingState = "COMPLETED"
 )
 
 // OnboardingSession represents an active onboarding session
 type OnboardingSession struct {
-	OnboardingID        string    `json:"onboarding_id"`
-	CBUID               string    `json:"cbu_id"`
-	CurrentState        OnboardingState `json:"current_state"`
-	CurrentVersion      int       `json:"current_version"`
-	LatestDSLVersionID  *string   `json:"latest_dsl_version_id,omitempty"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	OnboardingID       string          `json:"onboarding_id"`
+	CBUID              string          `json:"cbu_id"`
+	CurrentState       OnboardingState `json:"current_state"`
+	CurrentVersion     int             `json:"current_version"`
+	LatestDSLVersionID *string         `json:"latest_dsl_version_id,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
 }
 
 // DSLVersionWithState represents a DSL version with state information

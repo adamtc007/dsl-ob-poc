@@ -16,13 +16,13 @@ import (
 
 // ExecutionContext holds the state and resources for executing DSL commands
 type ExecutionContext struct {
-	Variables     map[string]interface{} // Variable bindings (UUID -> value)
-	CurrentCBU    string                 // Current CBU being processed
-	ExecutionLog  []string               // Log of executed commands
-	ErrorLog      []string               // Log of execution errors
-	CreatedAt     time.Time              // Execution start time
-	Version       int                    // DSL version being executed
-	State         string                 // Current onboarding state
+	Variables    map[string]interface{} // Variable bindings (UUID -> value)
+	CurrentCBU   string                 // Current CBU being processed
+	ExecutionLog []string               // Log of executed commands
+	ErrorLog     []string               // Log of execution errors
+	CreatedAt    time.Time              // Execution start time
+	Version      int                    // DSL version being executed
+	State        string                 // Current onboarding state
 }
 
 // ExecutionResult represents the result of executing a DSL command
@@ -69,9 +69,9 @@ func NewDSLExecutor(cbuID string) *DSLExecutor {
 
 // SExpression represents a parsed S-expression
 type SExpression struct {
-	Operator string         `json:"operator"`
-	Args     []interface{}  `json:"args"`
-	Raw      string         `json:"raw"`
+	Operator string        `json:"operator"`
+	Args     []interface{} `json:"args"`
+	Raw      string        `json:"raw"`
 }
 
 // ParseSExpression parses a single S-expression from a string
@@ -500,9 +500,9 @@ func (e *DSLExecutor) executeResourcesPlan(sexpr *SExpression) *ExecutionResult 
 	}
 
 	return &ExecutionResult{
-		Success: true,
-		Command: "resources.plan",
-		Output:  resource,
+		Success:   true,
+		Command:   "resources.plan",
+		Output:    resource,
 		Variables: e.Context.Variables,
 	}
 }
@@ -605,14 +605,14 @@ func (e *DSLExecutor) ExecuteBatch(commands []string) ([]*ExecutionResult, error
 // GetExecutionSummary returns a summary of the execution context
 func (e *DSLExecutor) GetExecutionSummary() map[string]interface{} {
 	return map[string]interface{}{
-		"cbu_id":         e.Context.CurrentCBU,
-		"state":          e.Context.State,
-		"version":        e.Context.Version,
-		"variables":      e.Context.Variables,
-		"commands_run":   len(e.Context.ExecutionLog),
-		"errors":         len(e.Context.ErrorLog),
-		"execution_log":  e.Context.ExecutionLog,
-		"created_at":     e.Context.CreatedAt,
+		"cbu_id":        e.Context.CurrentCBU,
+		"state":         e.Context.State,
+		"version":       e.Context.Version,
+		"variables":     e.Context.Variables,
+		"commands_run":  len(e.Context.ExecutionLog),
+		"errors":        len(e.Context.ErrorLog),
+		"execution_log": e.Context.ExecutionLog,
+		"created_at":    e.Context.CreatedAt,
 	}
 }
 

@@ -9,11 +9,11 @@ import (
 )
 
 var (
-	reUUID         = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	reVersion      = regexp.MustCompile(`^1\.\d+\.\d+$`)
-	reCurrency     = regexp.MustCompile(`^[A-Z]{3}$`)
-	reAttrID       = regexp.MustCompile(`^[A-Z]+(\.[A-Z0-9_\[\]\-]+)*$`)
-	reIdempotency  = regexp.MustCompile(`^[A-Za-z0-9_-]{10,128}$`)
+	reUUID        = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	reVersion     = regexp.MustCompile(`^1\.\d+\.\d+$`)
+	reCurrency    = regexp.MustCompile(`^[A-Z]{3}$`)
+	reAttrID      = regexp.MustCompile(`^[A-Z]+(\.[A-Z0-9_\[\]\-]+)*$`)
+	reIdempotency = regexp.MustCompile(`^[A-Za-z0-9_-]{10,128}$`)
 )
 
 // ---------- Public API ----------
@@ -33,7 +33,7 @@ func (p *Plan) Validate() error {
 	if !reUUID.MatchString(p.PlanID) {
 		return errors.New("plan_id must be a UUID string")
 	}
-	if p.Steps == nil || len(p.Steps) == 0 {
+	if len(p.Steps) == 0 {
 		return errors.New("steps must be non-empty")
 	}
 	// created_at must be valid RFC3339 (json already parsed into time.Time)
@@ -78,11 +78,21 @@ func (s *Step) validate() error {
 
 	case OpInvestorRecordIndication:
 		var a InvestorRecordIndicationArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if !reUUID.MatchString(a.FundID) { return errors.New("fund_id must be UUID") }
-		if !reUUID.MatchString(a.ClassID) { return errors.New("class_id must be UUID") }
-		if a.Ticket < 0 { return errors.New("ticket must be >= 0") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if !reUUID.MatchString(a.FundID) {
+			return errors.New("fund_id must be UUID")
+		}
+		if !reUUID.MatchString(a.ClassID) {
+			return errors.New("class_id must be UUID")
+		}
+		if a.Ticket < 0 {
+			return errors.New("ticket must be >= 0")
+		}
 		if a.Currency != nil && !reCurrency.MatchString(*a.Currency) {
 			return fmt.Errorf("currency must match %q", reCurrency.String())
 		}
@@ -95,21 +105,32 @@ func (s *Step) validate() error {
 
 	case OpKYCBegin:
 		var a KYCBeginArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
 		if a.RiskRating != nil {
 			switch *a.RiskRating {
-			case "LOW","MEDIUM","HIGH":
-			default: return errors.New("risk_rating must be LOW|MEDIUM|HIGH")
+			case "LOW", "MEDIUM", "HIGH":
+			default:
+				return errors.New("risk_rating must be LOW|MEDIUM|HIGH")
 			}
 		}
 		return nil
 
 	case OpKYCCollectDoc:
 		var a KYCCollectDocArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if a.DocType == "" { return errors.New("doc_type required") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if a.DocType == "" {
+			return errors.New("doc_type required")
+		}
 		if a.SubjectID != nil && !reUUID.MatchString(*a.SubjectID) {
 			return errors.New("subject_id must be UUID")
 		}
@@ -127,9 +148,15 @@ func (s *Step) validate() error {
 
 	case OpKYCScreen:
 		var a KYCScreenArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if a.Provider == "" { return errors.New("provider required") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if a.Provider == "" {
+			return errors.New("provider required")
+		}
 		if a.ScreeningDate != nil {
 			if err := validateDate(*a.ScreeningDate); err != nil {
 				return fmt.Errorf("screening_date: %w", err)
@@ -139,17 +166,33 @@ func (s *Step) validate() error {
 
 	case OpKYCApprove:
 		var a KYCApproveArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		switch a.Risk { case "LOW","MEDIUM","HIGH": default: return errors.New("risk must be LOW|MEDIUM|HIGH") }
-		if err := validateDate(a.RefreshDue); err != nil { return fmt.Errorf("refresh_due: %w", err) }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		switch a.Risk {
+		case "LOW", "MEDIUM", "HIGH":
+		default:
+			return errors.New("risk must be LOW|MEDIUM|HIGH")
+		}
+		if err := validateDate(a.RefreshDue); err != nil {
+			return fmt.Errorf("refresh_due: %w", err)
+		}
 		return nil
 
 	case OpTaxCapture:
 		var a TaxCaptureArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if a.FATCA == "" || a.CRS == "" || a.Form == "" { return errors.New("fatca, crs, form required") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if a.FATCA == "" || a.CRS == "" || a.Form == "" {
+			return errors.New("fatca, crs, form required")
+		}
 		if a.WithholdingRate != nil && (*a.WithholdingRate < 0 || *a.WithholdingRate > 100) {
 			return errors.New("withholding_rate must be between 0 and 100")
 		}
@@ -167,9 +210,15 @@ func (s *Step) validate() error {
 
 	case OpBankSetInstruction:
 		var a BankSetInstructionArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if !reCurrency.MatchString(a.Currency) { return fmt.Errorf("currency must match %q", reCurrency.String()) }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if !reCurrency.MatchString(a.Currency) {
+			return fmt.Errorf("currency must match %q", reCurrency.String())
+		}
 		if a.ActiveFrom != nil {
 			if err := validateDate(*a.ActiveFrom); err != nil {
 				return fmt.Errorf("active_from: %w", err)
@@ -180,20 +229,34 @@ func (s *Step) validate() error {
 				return fmt.Errorf("active_to: %w", err)
 			}
 		}
-		if a.SWIFTBIC == "" { return errors.New("swift_bic required") }
+		if a.SWIFTBIC == "" {
+			return errors.New("swift_bic required")
+		}
 		return nil
 
 	case OpSubscribeRequest:
 		var a SubscribeRequestArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if !reUUID.MatchString(a.ClassID) { return errors.New("class_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if !reUUID.MatchString(a.ClassID) {
+			return errors.New("class_id must be UUID")
+		}
 		if a.SeriesID != nil && !reUUID.MatchString(*a.SeriesID) {
 			return errors.New("series_id must be UUID")
 		}
-		if a.Amount < 0 { return errors.New("amount must be >= 0") }
-		if !reCurrency.MatchString(a.Currency) { return fmt.Errorf("currency must match %q", reCurrency.String()) }
-		if err := validateDate(a.TradeDate); err != nil { return fmt.Errorf("trade_date: %w", err) }
+		if a.Amount < 0 {
+			return errors.New("amount must be >= 0")
+		}
+		if !reCurrency.MatchString(a.Currency) {
+			return fmt.Errorf("currency must match %q", reCurrency.String())
+		}
+		if err := validateDate(a.TradeDate); err != nil {
+			return fmt.Errorf("trade_date: %w", err)
+		}
 		if a.BankID != nil && !reUUID.MatchString(*a.BankID) {
 			return errors.New("bank_id must be UUID")
 		}
@@ -201,24 +264,40 @@ func (s *Step) validate() error {
 
 	case OpCashConfirm:
 		var a CashConfirmArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
 		if a.TradeID != nil && !reUUID.MatchString(*a.TradeID) {
 			return errors.New("trade_id must be UUID")
 		}
-		if a.Amount < 0 { return errors.New("amount must be >= 0") }
-		if err := validateDate(a.ValueDate); err != nil { return fmt.Errorf("value_date: %w", err) }
-		if a.BankID != nil && !reUUID.MatchString(*a.BankID) { return errors.New("bank_id must be UUID") }
+		if a.Amount < 0 {
+			return errors.New("amount must be >= 0")
+		}
+		if err := validateDate(a.ValueDate); err != nil {
+			return fmt.Errorf("value_date: %w", err)
+		}
+		if a.BankID != nil && !reUUID.MatchString(*a.BankID) {
+			return errors.New("bank_id must be UUID")
+		}
 		return nil
 
 	case OpDealNAV:
 		var a DealNAVArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.FundID) { return errors.New("fund_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.FundID) {
+			return errors.New("fund_id must be UUID")
+		}
 		if a.ClassID != nil && !reUUID.MatchString(*a.ClassID) {
 			return errors.New("class_id must be UUID")
 		}
-		if err := validateDate(a.NAVDate); err != nil { return fmt.Errorf("nav_date: %w", err) }
+		if err := validateDate(a.NAVDate); err != nil {
+			return fmt.Errorf("nav_date: %w", err)
+		}
 		if a.NAVPerShare != nil && *a.NAVPerShare <= 0 {
 			return errors.New("nav_per_share must be > 0")
 		}
@@ -229,15 +308,27 @@ func (s *Step) validate() error {
 
 	case OpSubscribeIssue:
 		var a SubscribeIssueArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
 		if a.TradeID != nil && !reUUID.MatchString(*a.TradeID) {
 			return errors.New("trade_id must be UUID")
 		}
-		if !reUUID.MatchString(a.ClassID) { return errors.New("class_id must be UUID") }
-		if a.SeriesID != nil && !reUUID.MatchString(*a.SeriesID) { return errors.New("series_id must be UUID") }
-		if a.NAVPerShare <= 0 { return errors.New("nav_per_share must be > 0") }
-		if a.Units <= 0 { return errors.New("units must be > 0") }
+		if !reUUID.MatchString(a.ClassID) {
+			return errors.New("class_id must be UUID")
+		}
+		if a.SeriesID != nil && !reUUID.MatchString(*a.SeriesID) {
+			return errors.New("series_id must be UUID")
+		}
+		if a.NAVPerShare <= 0 {
+			return errors.New("nav_per_share must be > 0")
+		}
+		if a.Units <= 0 {
+			return errors.New("units must be > 0")
+		}
 		if a.NAVDate != nil {
 			if err := validateDate(*a.NAVDate); err != nil {
 				return fmt.Errorf("nav_date: %w", err)
@@ -255,40 +346,66 @@ func (s *Step) validate() error {
 
 	case OpKYCRefreshSchedule:
 		var a KYCRefreshScheduleArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if a.Frequency == "" { return errors.New("frequency required") }
-		switch a.Frequency {
-		case "ANNUAL","BIANNUAL","QUARTERLY","MONTHLY":
-		default: return errors.New("frequency must be ANNUAL|BIANNUAL|QUARTERLY|MONTHLY")
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
 		}
-		if err := validateDate(a.Next); err != nil { return fmt.Errorf("next: %w", err) }
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if a.Frequency == "" {
+			return errors.New("frequency required")
+		}
+		switch a.Frequency {
+		case "ANNUAL", "BIANNUAL", "QUARTERLY", "MONTHLY":
+		default:
+			return errors.New("frequency must be ANNUAL|BIANNUAL|QUARTERLY|MONTHLY")
+		}
+		if err := validateDate(a.Next); err != nil {
+			return fmt.Errorf("next: %w", err)
+		}
 		return nil
 
 	case OpScreenContinuous:
 		var a ScreenContinuousArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if a.Frequency == "" { return errors.New("frequency required") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if a.Frequency == "" {
+			return errors.New("frequency required")
+		}
 		switch a.Frequency {
-		case "DAILY","WEEKLY","MONTHLY":
-		default: return errors.New("frequency must be DAILY|WEEKLY|MONTHLY")
+		case "DAILY", "WEEKLY", "MONTHLY":
+		default:
+			return errors.New("frequency must be DAILY|WEEKLY|MONTHLY")
 		}
 		return nil
 
 	case OpRedeemRequest:
 		var a RedeemRequestArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
-		if !reUUID.MatchString(a.ClassID) { return errors.New("class_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
+		if !reUUID.MatchString(a.ClassID) {
+			return errors.New("class_id must be UUID")
+		}
 		if a.SeriesID != nil && !reUUID.MatchString(*a.SeriesID) {
 			return errors.New("series_id must be UUID")
 		}
-		if a.Units <= 0 { return errors.New("units must be > 0") }
+		if a.Units <= 0 {
+			return errors.New("units must be > 0")
+		}
 		if a.Percentage != nil && (*a.Percentage <= 0 || *a.Percentage > 100) {
 			return errors.New("percentage must be between 0 and 100")
 		}
-		if err := validateDate(a.NoticeDate); err != nil { return fmt.Errorf("notice_date: %w", err) }
+		if err := validateDate(a.NoticeDate); err != nil {
+			return fmt.Errorf("notice_date: %w", err)
+		}
 		if a.TradeDate != nil {
 			if err := validateDate(*a.TradeDate); err != nil {
 				return fmt.Errorf("trade_date: %w", err)
@@ -301,14 +418,24 @@ func (s *Step) validate() error {
 
 	case OpRedeemSettle:
 		var a RedeemSettleArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
 		if a.TradeID != nil && !reUUID.MatchString(*a.TradeID) {
 			return errors.New("trade_id must be UUID")
 		}
-		if a.Amount < 0 { return errors.New("amount must be >= 0") }
-		if err := validateDate(a.SettleDate); err != nil { return fmt.Errorf("settle_date: %w", err) }
-		if a.BankID != nil && !reUUID.MatchString(*a.BankID) { return errors.New("bank_id must be UUID") }
+		if a.Amount < 0 {
+			return errors.New("amount must be >= 0")
+		}
+		if err := validateDate(a.SettleDate); err != nil {
+			return fmt.Errorf("settle_date: %w", err)
+		}
+		if a.BankID != nil && !reUUID.MatchString(*a.BankID) {
+			return errors.New("bank_id must be UUID")
+		}
 		if a.FXRate != nil && *a.FXRate <= 0 {
 			return errors.New("fx_rate must be > 0")
 		}
@@ -319,8 +446,12 @@ func (s *Step) validate() error {
 
 	case OpOffboardClose:
 		var a OffboardCloseArgs
-		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil { return err }
-		if !reUUID.MatchString(a.InvestorID) { return errors.New("investor_id must be UUID") }
+		if err := json.Unmarshal(s.ArgsRaw, &a); err != nil {
+			return err
+		}
+		if !reUUID.MatchString(a.InvestorID) {
+			return errors.New("investor_id must be UUID")
+		}
 		if a.ClosureDate != nil {
 			if err := validateDate(*a.ClosureDate); err != nil {
 				return fmt.Errorf("closure_date: %w", err)
@@ -328,8 +459,9 @@ func (s *Step) validate() error {
 		}
 		if a.Reason != nil {
 			switch *a.Reason {
-			case "VOLUNTARY","INVOLUNTARY","REGULATORY","DECEASED","MERGED":
-			default: return errors.New("reason must be VOLUNTARY|INVOLUNTARY|REGULATORY|DECEASED|MERGED")
+			case "VOLUNTARY", "INVOLUNTARY", "REGULATORY", "DECEASED", "MERGED":
+			default:
+				return errors.New("reason must be VOLUNTARY|INVOLUNTARY|REGULATORY|DECEASED|MERGED")
 			}
 		}
 		if a.RetentionPeriodYears != nil && *a.RetentionPeriodYears < 0 {

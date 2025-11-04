@@ -44,10 +44,10 @@ func RunAgentTest(ctx context.Context, ds datastore.DataStore, args []string) er
 
 		// Test different scenarios
 		scenarios := []struct {
-			name         string
-			nature       string
-			products     []string
-			description  string
+			name        string
+			nature      string
+			products    []string
+			description string
 		}{
 			{
 				name:        "UCITS Fund",

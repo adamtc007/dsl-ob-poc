@@ -248,7 +248,7 @@ func (p *postgresAdapter) ListOnboardingSessions(ctx context.Context) ([]store.O
 	return p.store.ListOnboardingSessions(ctx)
 }
 
-func (p *postgresAdapter) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (json.RawMessage, map[string]any, string, error) {
+func (p *postgresAdapter) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (payload json.RawMessage, provenance map[string]any, status string, err error) {
 	return p.store.ResolveValueFor(ctx, cbuID, attributeID)
 }
 
@@ -357,7 +357,7 @@ func (m *mockAdapter) GetDSLHistory(ctx context.Context, cbuID string) ([]store.
 	return m.store.GetDSLHistory(ctx, cbuID)
 }
 
-func (m *mockAdapter) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (json.RawMessage, map[string]any, string, error) {
+func (m *mockAdapter) ResolveValueFor(ctx context.Context, cbuID, attributeID string) (payload json.RawMessage, provenance map[string]any, status string, err error) {
 	return m.store.ResolveValueFor(ctx, cbuID, attributeID)
 }
 

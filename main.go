@@ -193,6 +193,52 @@ func run() int {
 	case "dsl-execute":
 		err = cli.RunDSLExecute(ctx, dataStore, args)
 
+	// HEDGE FUND INVESTOR COMMANDS
+	case "hf-create-investor":
+		err = cli.RunHFCreateInvestor(ctx, dataStore, args)
+	case "hf-record-indication":
+		err = cli.RunHFRecordIndication(ctx, dataStore, args)
+	case "hf-begin-kyc":
+		err = cli.RunHFBeginKYC(ctx, dataStore, args)
+	case "hf-approve-kyc":
+		err = cli.RunHFApproveKYC(ctx, dataStore, args)
+	case "hf-capture-tax":
+		err = cli.RunHFCaptureTax(ctx, dataStore, args)
+	case "hf-set-bank-instruction":
+		err = cli.RunHFSetBankInstruction(ctx, dataStore, args)
+	case "hf-collect-document":
+		err = cli.RunHFCollectDocument(ctx, dataStore, args)
+	case "hf-screen-investor":
+		err = cli.RunHFScreenInvestor(ctx, dataStore, args)
+	case "hf-subscribe-request":
+		err = cli.RunHFSubscribeRequest(ctx, dataStore, args)
+	case "hf-confirm-cash":
+		err = cli.RunHFConfirmCash(ctx, dataStore, args)
+	case "hf-set-nav":
+		err = cli.RunHFSetNAV(ctx, dataStore, args)
+	case "hf-issue-units":
+		err = cli.RunHFIssueUnits(ctx, dataStore, args)
+	case "hf-redeem-request":
+		err = cli.RunHFRedeemRequest(ctx, dataStore, args)
+	case "hf-settle-redemption":
+		err = cli.RunHFSettleRedemption(ctx, dataStore, args)
+	case "hf-offboard-investor":
+		err = cli.RunHFOffboardInvestor(ctx, dataStore, args)
+	case "hf-set-refresh-schedule":
+		err = cli.RunHFSetRefreshSchedule(ctx, dataStore, args)
+	case "hf-set-continuous-screening":
+		err = cli.RunHFSetContinuousScreening(ctx, dataStore, args)
+	case "hf-show-register":
+		err = cli.RunHFShowRegister(ctx, dataStore, args)
+	case "hf-show-kyc-dashboard":
+		err = cli.RunHFShowKYCDashboard(ctx, dataStore, args)
+	case "hf-positions":
+		err = cli.RunHFPositions(ctx, dataStore, args)
+	case "hf-pipeline":
+		err = cli.RunHFPipeline(ctx, dataStore, args)
+	case "hf-outstanding-kyc":
+		err = cli.RunHFOutstandingKYC(ctx, dataStore, args)
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
@@ -208,7 +254,7 @@ func run() int {
 }
 
 func printUsage() {
-	fmt.Println("Onboarding DSL POC CLI (v8: Entity Relationship Model)")
+	fmt.Println("Onboarding DSL POC CLI (v9: Hedge Fund Investor Register)")
 	fmt.Println("Usage: dsl-poc <command> [options]")
 	fmt.Println("\nEnvironment Variables:")
 	fmt.Println("  DSL_STORE_TYPE         Set to 'mock' for disconnected mode, 'postgresql' for database mode (default)")
@@ -226,6 +272,42 @@ func printUsage() {
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v5) Discovers and appends resources plan.")
 	fmt.Println("  populate-attributes --cbu=<cbu-id> (v6) Populates attribute values from runtime sources.")
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v7) Resolves and binds attribute values deterministically.")
+	fmt.Println("\nHedge Fund Investor Commands:")
+	fmt.Println("  Investor Lifecycle:")
+	fmt.Println("    hf-create-investor --code=<code> --legal-name=<name> --type=<type> --domicile=<country>")
+	fmt.Println("                       [--short-name=<name>] [--contact-email=<email>] [--address1=<addr>]")
+	fmt.Println("    hf-record-indication --investor=<uuid> --fund=<uuid> --class=<uuid> --ticket=<amount> --currency=<ccy>")
+	fmt.Println("  KYC & Compliance:")
+	fmt.Println("    hf-begin-kyc --investor=<uuid> [--tier=<SIMPLIFIED|STANDARD|ENHANCED>]")
+	fmt.Println("    hf-collect-document --investor=<uuid> --doc-type=<type> [--subject=<subject>] [--file-path=<path>]")
+	fmt.Println("    hf-screen-investor --investor=<uuid> --provider=<worldcheck|refinitiv|accelus>")
+	fmt.Println("    hf-approve-kyc --investor=<uuid> --risk=<LOW|MEDIUM|HIGH> --refresh-due=<YYYY-MM-DD> --approved-by=<name>")
+	fmt.Println("    hf-set-refresh-schedule --investor=<uuid> --frequency=<MONTHLY|QUARTERLY|ANNUAL> --next=<YYYY-MM-DD>")
+	fmt.Println("    hf-set-continuous-screening --investor=<uuid> --frequency=<DAILY|WEEKLY|MONTHLY>")
+	fmt.Println("  Tax & Banking:")
+	fmt.Println("    hf-capture-tax --investor=<uuid> [--fatca=<status>] [--crs=<classification>] [--form=<type>]")
+	fmt.Println("    hf-set-bank-instruction --investor=<uuid> --currency=<ccy> --bank-name=<name> --account-name=<name>")
+	fmt.Println("                            [--iban=<iban>] [--swift=<bic>] [--account-num=<number>]")
+	fmt.Println("  Trading Operations:")
+	fmt.Println("    hf-subscribe-request --investor=<uuid> --fund=<uuid> --class=<uuid> --amount=<amount>")
+	fmt.Println("                         --currency=<ccy> --trade-date=<YYYY-MM-DD> --value-date=<YYYY-MM-DD>")
+	fmt.Println("    hf-confirm-cash --investor=<uuid> --trade=<uuid> --amount=<amount> --value-date=<YYYY-MM-DD>")
+	fmt.Println("                    --bank-currency=<ccy> [--reference=<ref>]")
+	fmt.Println("    hf-set-nav --fund=<uuid> --class=<uuid> --nav-date=<YYYY-MM-DD> --nav=<amount>")
+	fmt.Println("    hf-issue-units --investor=<uuid> --trade=<uuid> --class=<uuid> [--series=<uuid>]")
+	fmt.Println("                   --nav-per-share=<amount> --units=<amount>")
+	fmt.Println("  Redemption & Offboarding:")
+	fmt.Println("    hf-redeem-request --investor=<uuid> --class=<uuid> [--units=<amount>|--percentage=<pct>]")
+	fmt.Println("                      --notice-date=<YYYY-MM-DD> --value-date=<YYYY-MM-DD>")
+	fmt.Println("    hf-settle-redemption --investor=<uuid> --trade=<uuid> --amount=<amount>")
+	fmt.Println("                         --settle-date=<YYYY-MM-DD> [--reference=<ref>]")
+	fmt.Println("    hf-offboard-investor --investor=<uuid> [--reason=<reason>]")
+	fmt.Println("  Reporting:")
+	fmt.Println("    hf-show-register [--fund=<uuid>] [--class=<uuid>] [--status=<status>] [--format=<table|json|csv>]")
+	fmt.Println("    hf-show-kyc-dashboard [--risk=<LOW|MEDIUM|HIGH>] [--status=<status>] [--overdue]")
+	fmt.Println("    hf-positions --as-of=<YYYY-MM-DD> [--investor-id=<uuid>] [--fund-id=<uuid>] [--output=<table|json|csv>]")
+	fmt.Println("    hf-pipeline [--type=<type>] [--domicile=<country>] [--percentages] [--output=<table|json|csv>]")
+	fmt.Println("    hf-outstanding-kyc [--investor-id=<uuid>] [--doc-type=<type>] [--overdue] [--output=<table|json|csv>]")
 	fmt.Println("\nAI Agent Commands (requires GEMINI_API_KEY):")
 	fmt.Println("  agent-transform --cbu=<cbu-id>   AI-powered DSL transformation with natural language instructions")
 	fmt.Println("                  --instruction=<text> [--target-state=<state>] [--save]")

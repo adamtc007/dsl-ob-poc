@@ -116,7 +116,7 @@ func runDemoWorkflow(executor *dsl.DSLExecutor) error {
 	// Execute all commands
 	results, err := executor.ExecuteBatch(commands)
 	if err != nil {
-		return fmt.Errorf("demo execution failed: %v", err)
+		return fmt.Errorf("demo execution failed: %w", err)
 	}
 
 	// Display results
@@ -163,7 +163,7 @@ func executeFromFile(executor *dsl.DSLExecutor, filePath string) error {
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read file %s: %v", filePath, err)
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
 	// Split content into individual S-expressions
@@ -174,7 +174,7 @@ func executeFromFile(executor *dsl.DSLExecutor, filePath string) error {
 	// Execute all commands
 	results, err := executor.ExecuteBatch(commands)
 	if err != nil {
-		return fmt.Errorf("file execution failed: %v", err)
+		return fmt.Errorf("file execution failed: %w", err)
 	}
 
 	// Display results
