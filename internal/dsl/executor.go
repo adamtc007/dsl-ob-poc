@@ -264,13 +264,13 @@ func (e *DSLExecutor) executeCaseCreate(sexpr *SExpression) *ExecutionResult {
 			switch nested.Operator {
 			case "cbu.id":
 				if len(nested.Args) > 0 {
-					if id, ok := nested.Args[0].(string); ok {
-						cbuID = id
+					if idStr, ok2 := nested.Args[0].(string); ok2 {
+						cbuID = idStr
 					}
 				}
 			case "nature-purpose":
 				if len(nested.Args) > 0 {
-					if purpose, ok := nested.Args[0].(string); ok {
+					if purpose, ok2 := nested.Args[0].(string); ok2 {
 						naturePurpose = purpose
 					}
 				}
@@ -346,17 +346,17 @@ func (e *DSLExecutor) executeValuesBind(sexpr *SExpression) *ExecutionResult {
 	for _, arg := range sexpr.Args {
 		if nested, ok := arg.(*SExpression); ok && nested.Operator == "bind" {
 			for _, bindArg := range nested.Args {
-				if bindNested, ok := bindArg.(*SExpression); ok {
+				if bindNested, okBind := bindArg.(*SExpression); okBind {
 					switch bindNested.Operator {
 					case "attr-id":
 						if len(bindNested.Args) > 0 {
-							if id, ok := bindNested.Args[0].(string); ok {
+							if id, okId := bindNested.Args[0].(string); okId {
 								attrID = id
 							}
 						}
 					case "value":
 						if len(bindNested.Args) > 0 {
-							if val, ok := bindNested.Args[0].(string); ok {
+							if val, okVal := bindNested.Args[0].(string); okVal {
 								value = val
 							}
 						}
@@ -399,9 +399,9 @@ func (e *DSLExecutor) executeKYCStart(sexpr *SExpression) *ExecutionResult {
 			switch nested.Operator {
 			case "documents":
 				for _, docArg := range nested.Args {
-					if docNested, ok := docArg.(*SExpression); ok && docNested.Operator == "document" {
+					if docNested, okDoc := docArg.(*SExpression); okDoc && docNested.Operator == "document" {
 						if len(docNested.Args) > 0 {
-							if doc, ok := docNested.Args[0].(string); ok {
+							if doc, okDocValue := docNested.Args[0].(string); okDocValue {
 								documents = append(documents, doc)
 							}
 						}
@@ -409,9 +409,9 @@ func (e *DSLExecutor) executeKYCStart(sexpr *SExpression) *ExecutionResult {
 				}
 			case "jurisdictions":
 				for _, jurArg := range nested.Args {
-					if jurNested, ok := jurArg.(*SExpression); ok && jurNested.Operator == "jurisdiction" {
+					if jurNested, okJur := jurArg.(*SExpression); okJur && jurNested.Operator == "jurisdiction" {
 						if len(jurNested.Args) > 0 {
-							if jur, ok := jurNested.Args[0].(string); ok {
+							if jur, okJurValue := jurNested.Args[0].(string); okJurValue {
 								jurisdictions = append(jurisdictions, jur)
 							}
 						}
@@ -445,25 +445,25 @@ func (e *DSLExecutor) executeResourcesPlan(sexpr *SExpression) *ExecutionResult 
 	for _, arg := range sexpr.Args {
 		if nested, ok := arg.(*SExpression); ok && nested.Operator == "resource.create" {
 			if len(nested.Args) > 0 {
-				if name, ok := nested.Args[0].(string); ok {
+				if name, ok1 := nested.Args[0].(string); ok1 {
 					resourceName = name
 				}
 			}
 
 			for i := 1; i < len(nested.Args); i++ {
-				if nestedArg, ok := nested.Args[i].(*SExpression); ok {
+				if nestedArg, ok2 := nested.Args[i].(*SExpression); ok2 {
 					switch nestedArg.Operator {
 					case "owner":
 						if len(nestedArg.Args) > 0 {
-							if ownerVal, ok := nestedArg.Args[0].(string); ok {
+							if ownerVal, ok3 := nestedArg.Args[0].(string); ok3 {
 								owner = ownerVal
 							}
 						}
 					case "var":
 						for _, varArg := range nestedArg.Args {
-							if varNested, ok := varArg.(*SExpression); ok && varNested.Operator == "attr-id" {
+							if varNested, ok4 := varArg.(*SExpression); ok4 && varNested.Operator == "attr-id" {
 								if len(varNested.Args) > 0 {
-									if id, ok := varNested.Args[0].(string); ok {
+									if id, ok5 := varNested.Args[0].(string); ok5 {
 										attrID = id
 									}
 								}
@@ -508,23 +508,23 @@ func (e *DSLExecutor) executeResourcesPlan(sexpr *SExpression) *ExecutionResult 
 }
 
 // Placeholder implementations for other commands
-func (e *DSLExecutor) executeCaseUpdate(sexpr *SExpression) *ExecutionResult {
+func (e *DSLExecutor) executeCaseUpdate(_ *SExpression) *ExecutionResult {
 	return &ExecutionResult{Success: true, Command: "case.update", Output: "Updated"}
 }
 
-func (e *DSLExecutor) executeCaseApprove(sexpr *SExpression) *ExecutionResult {
+func (e *DSLExecutor) executeCaseApprove(_ *SExpression) *ExecutionResult {
 	return &ExecutionResult{Success: true, Command: "case.approve", Output: "Approved"}
 }
 
-func (e *DSLExecutor) executeServicesDiscover(sexpr *SExpression) *ExecutionResult {
+func (e *DSLExecutor) executeServicesDiscover(_ *SExpression) *ExecutionResult {
 	return &ExecutionResult{Success: true, Command: "services.discover", Output: "Services discovered"}
 }
 
-func (e *DSLExecutor) executeAttributesDefine(sexpr *SExpression) *ExecutionResult {
+func (e *DSLExecutor) executeAttributesDefine(_ *SExpression) *ExecutionResult {
 	return &ExecutionResult{Success: true, Command: "attributes.define", Output: "Attribute defined"}
 }
 
-func (e *DSLExecutor) executeWorkflowTransition(sexpr *SExpression) *ExecutionResult {
+func (e *DSLExecutor) executeWorkflowTransition(_ *SExpression) *ExecutionResult {
 	return &ExecutionResult{Success: true, Command: "workflow.transition", Output: "State transitioned"}
 }
 
@@ -537,13 +537,13 @@ func (e *DSLExecutor) executeTasksCreate(sexpr *SExpression) *ExecutionResult {
 			switch nested.Operator {
 			case "task.id":
 				if len(nested.Args) > 0 {
-					if id, ok := nested.Args[0].(string); ok {
+					if id, ok1 := nested.Args[0].(string); ok1 {
 						taskID = id
 					}
 				}
 			case "type":
 				if len(nested.Args) > 0 {
-					if typ, ok := nested.Args[0].(string); ok {
+					if typ, ok1 := nested.Args[0].(string); ok1 {
 						taskType = typ
 					}
 				}
@@ -584,7 +584,7 @@ func (e *DSLExecutor) executeTasksCreate(sexpr *SExpression) *ExecutionResult {
 
 // ExecuteBatch executes multiple DSL commands in sequence
 func (e *DSLExecutor) ExecuteBatch(commands []string) ([]*ExecutionResult, error) {
-	var results []*ExecutionResult
+	results := make([]*ExecutionResult, 0, len(commands))
 
 	for _, command := range commands {
 		result, err := e.Execute(command)

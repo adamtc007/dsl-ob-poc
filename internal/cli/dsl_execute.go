@@ -201,7 +201,7 @@ func executeSingleCommand(executor *dsl.DSLExecutor, command string) error {
 
 	result, err := executor.Execute(command)
 	if err != nil {
-		return fmt.Errorf("execution failed: %v", err)
+		return fmt.Errorf("execution failed: %w", err)
 	}
 
 	log.Printf("\n📊 Result:")
@@ -237,7 +237,9 @@ func runInteractiveMode(executor *dsl.DSLExecutor) error {
 		fmt.Print("\ndsl> ")
 
 		var input string
-		fmt.Scanln(&input)
+		if _, err := fmt.Scanln(&input); err != nil {
+			fmt.Printf("Error reading input: %v\n", err)
+		}
 
 		if input == "exit" {
 			log.Printf("👋 Goodbye!")

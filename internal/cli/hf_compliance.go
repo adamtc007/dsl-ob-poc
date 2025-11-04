@@ -12,6 +12,95 @@ import (
 	"github.com/google/uuid"
 )
 
+// processInvestorOperation is a helper function to handle common investor operation patterns
+func processInvestorOperation(
+	verb string,
+	flagSetName string,
+	args []string,
+	requireFields []string,
+	argMap map[string]interface{},
+	successMessage string,
+) error {
+	fs := flag.NewFlagSet(flagSetName, flag.ExitOnError)
+
+	// Parse all flags
+	for k, v := range argMap {
+		if val, ok := v.(*string); ok && argMap[k] != nil {
+			fs.StringVar(val, k, "", "")
+		}
+	}
+
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("failed to parse flags: %w", err)
+	}
+
+	// Validate required fields
+	missingFields := false
+	for _, field := range requireFields {
+		if strPtr, ok := argMap[field].(*string); ok && *strPtr == "" {
+			missingFields = true
+			break
+		}
+	}
+
+	if missingFields {
+		fs.Usage()
+		return fmt.Errorf("error: required flags are missing")
+	}
+
+	// Validate UUID
+	investorIDPtr := argMap["investor"].(*string)
+	investorUUID, err := uuid.Parse(*investorIDPtr)
+	if err != nil {
+		return fmt.Errorf("invalid investor ID format: %s", *investorIDPtr)
+	}
+
+	// Create operation args map for DSL
+	operationArgs := make(map[string]interface{})
+	operationArgs["investor"] = investorUUID.String()
+
+	for k, v := range argMap {
+		if k == "investor" {
+			continue // Already added
+		}
+
+		if strPtr, ok := v.(*string); ok && *strPtr != "" {
+			operationArgs[k] = *strPtr
+		}
+	}
+
+	// Create DSL operation
+	operation := &dsl.HedgeFundDSLOperation{
+		Verb:      verb,
+		Args:      operationArgs,
+		Timestamp: time.Now().UTC(),
+	}
+
+	// Validate the DSL operation
+	if err := dsl.ValidateHedgeFundDSLOperation(operation); err != nil {
+		return fmt.Errorf("invalid DSL operation: %w", err)
+	}
+
+	// Generate DSL text
+	dslText := dsl.GenerateHedgeFundDSL(operation)
+
+	// Print operation details
+	fmt.Printf("%s:\n", flagSetName)
+	fmt.Printf("  Investor: %s\n", *investorIDPtr)
+	for k, v := range argMap {
+		if k == "investor" {
+			continue // Already printed
+		}
+		if strPtr, ok := v.(*string); ok && *strPtr != "" {
+			fmt.Printf("  %s: %s\n", k, *strPtr)
+		}
+	}
+	fmt.Printf("\nGenerated DSL:\n%s\n", dslText)
+	fmt.Printf("\n%s\n", successMessage)
+
+	return nil
+}
+
 // RunHFCaptureTax handles the 'hf-capture-tax' command for capturing tax information
 func RunHFCaptureTax(ctx context.Context, ds datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("hf-capture-tax", flag.ExitOnError)
@@ -246,54 +335,24 @@ func RunHFCollectDocument(ctx context.Context, ds datastore.DataStore, args []st
 
 // RunHFScreenInvestor handles the 'hf-screen-investor' command for screening investors
 func RunHFScreenInvestor(ctx context.Context, ds datastore.DataStore, args []string) error {
-	fs := flag.NewFlagSet("hf-screen-investor", flag.ExitOnError)
+	investorID := new(string)
+	provider := new(string)
 
-	investorID := fs.String("investor", "", "Investor ID (UUID) (required)")
-	provider := fs.String("provider", "", "Screening provider: worldcheck, refinitiv, accelus (required)")
-
-	if err := fs.Parse(args); err != nil {
-		return fmt.Errorf("failed to parse flags: %w", err)
+	argMap := map[string]interface{}{
+		"investor": investorID,
+		"provider": provider,
 	}
 
-	// Validate required fields
-	if *investorID == "" || *provider == "" {
-		fs.Usage()
-		return fmt.Errorf("error: --investor and --provider flags are required")
-	}
+	requiredFields := []string{"investor", "provider"}
 
-	// Validate UUID
-	investorUUID, err := uuid.Parse(*investorID)
-	if err != nil {
-		return fmt.Errorf("invalid investor ID format: %s", *investorID)
-	}
-
-	// Create DSL operation for screening
-	operation := &dsl.HedgeFundDSLOperation{
-		Verb: "kyc.screen",
-		Args: map[string]interface{}{
-			"investor": investorUUID.String(),
-			"provider": *provider,
-		},
-		Timestamp: time.Now().UTC(),
-	}
-
-	// Validate the DSL operation
-	if err := dsl.ValidateHedgeFundDSLOperation(operation); err != nil {
-		return fmt.Errorf("invalid DSL operation: %w", err)
-	}
-
-	// Generate DSL text
-	dslText := dsl.GenerateHedgeFundDSL(operation)
-
-	fmt.Printf("Screening investor:\n")
-	fmt.Printf("  Investor: %s\n", *investorID)
-	fmt.Printf("  Provider: %s\n", *provider)
-	fmt.Printf("\nGenerated DSL:\n%s\n", dslText)
-
-	// TODO: Execute screening when HF investor store is implemented
-	fmt.Printf("\nInvestor screening initiated successfully\n")
-
-	return nil
+	return processInvestorOperation(
+		"kyc.screen",
+		"Screening investor",
+		args,
+		requiredFields,
+		argMap,
+		"Investor screening initiated successfully",
+	)
 }
 
 // RunHFSetRefreshSchedule handles the 'hf-set-refresh-schedule' command for setting KYC refresh schedules
@@ -358,54 +417,24 @@ func RunHFSetRefreshSchedule(ctx context.Context, ds datastore.DataStore, args [
 
 // RunHFSetContinuousScreening handles the 'hf-set-continuous-screening' command for continuous screening
 func RunHFSetContinuousScreening(ctx context.Context, ds datastore.DataStore, args []string) error {
-	fs := flag.NewFlagSet("hf-set-continuous-screening", flag.ExitOnError)
+	investorID := new(string)
+	frequency := new(string)
 
-	investorID := fs.String("investor", "", "Investor ID (UUID) (required)")
-	frequency := fs.String("frequency", "", "Screening frequency: DAILY, WEEKLY, MONTHLY (required)")
-
-	if err := fs.Parse(args); err != nil {
-		return fmt.Errorf("failed to parse flags: %w", err)
+	argMap := map[string]interface{}{
+		"investor":  investorID,
+		"frequency": frequency,
 	}
 
-	// Validate required fields
-	if *investorID == "" || *frequency == "" {
-		fs.Usage()
-		return fmt.Errorf("error: --investor and --frequency flags are required")
-	}
+	requiredFields := []string{"investor", "frequency"}
 
-	// Validate UUID
-	investorUUID, err := uuid.Parse(*investorID)
-	if err != nil {
-		return fmt.Errorf("invalid investor ID format: %s", *investorID)
-	}
-
-	// Create DSL operation for continuous screening
-	operation := &dsl.HedgeFundDSLOperation{
-		Verb: "screen.continuous",
-		Args: map[string]interface{}{
-			"investor":  investorUUID.String(),
-			"frequency": *frequency,
-		},
-		Timestamp: time.Now().UTC(),
-	}
-
-	// Validate the DSL operation
-	if err := dsl.ValidateHedgeFundDSLOperation(operation); err != nil {
-		return fmt.Errorf("invalid DSL operation: %w", err)
-	}
-
-	// Generate DSL text
-	dslText := dsl.GenerateHedgeFundDSL(operation)
-
-	fmt.Printf("Setting continuous screening:\n")
-	fmt.Printf("  Investor: %s\n", *investorID)
-	fmt.Printf("  Frequency: %s\n", *frequency)
-	fmt.Printf("\nGenerated DSL:\n%s\n", dslText)
-
-	// TODO: Set continuous screening when HF investor store is implemented
-	fmt.Printf("\nContinuous screening set successfully\n")
-
-	return nil
+	return processInvestorOperation(
+		"screen.continuous",
+		"Setting continuous screening",
+		args,
+		requiredFields,
+		argMap,
+		"Continuous screening set successfully",
+	)
 }
 
 // RunHFShowRegister handles the 'hf-show-register' command for displaying register of investors

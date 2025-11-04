@@ -126,8 +126,8 @@ func writeJSONFile(filePath string, data interface{}, dataType string) error {
 		return fmt.Errorf("failed to marshal %s: %w", dataType, err)
 	}
 
-	if err := os.WriteFile(filePath, jsonData, 0o644); err != nil {
-		return fmt.Errorf("failed to write %s file: %w", dataType, err)
+	if writeErr := os.WriteFile(filePath, jsonData, 0o644); writeErr != nil {
+		return fmt.Errorf("failed to write %s file: %w", dataType, writeErr)
 	}
 
 	fmt.Printf("Exported %s to %s\n", dataType, filePath)

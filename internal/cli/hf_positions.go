@@ -77,11 +77,11 @@ func outputPositionsTable(positions []store.PositionAsOf, asOfDate time.Time, sh
 		unitsWidth, "UNITS")
 
 	fmt.Printf("%s %s %s %s %s\n",
-		repeatChar("-", investorWidth),
-		repeatChar("-", fundWidth),
-		repeatChar("-", classWidth),
-		repeatChar("-", seriesWidth),
-		repeatChar("-", unitsWidth))
+		repeatChar(investorWidth),
+		repeatChar(fundWidth),
+		repeatChar(classWidth),
+		repeatChar(seriesWidth),
+		repeatChar(unitsWidth))
 
 	// Data rows
 	totalUnits := 0.0
@@ -103,11 +103,11 @@ func outputPositionsTable(positions []store.PositionAsOf, asOfDate time.Time, sh
 
 	// Summary
 	fmt.Printf("\n%s %s %s %s %s\n",
-		repeatChar("-", investorWidth),
-		repeatChar("-", fundWidth),
-		repeatChar("-", classWidth),
-		repeatChar("-", seriesWidth),
-		repeatChar("-", unitsWidth))
+		repeatChar(investorWidth),
+		repeatChar(fundWidth),
+		repeatChar(classWidth),
+		repeatChar(seriesWidth),
+		repeatChar(unitsWidth))
 
 	fmt.Printf("%-*s %-*s %-*s %-*s %*.6f\n",
 		investorWidth, "TOTAL",
@@ -134,10 +134,10 @@ func filterZeroPositions(positions []store.PositionAsOf, showZero bool) []store.
 	return filtered
 }
 
-func repeatChar(char string, count int) string {
+func repeatChar(count int) string {
 	result := ""
 	for i := 0; i < count; i++ {
-		result += char
+		result += "-"
 	}
 	return result
 }

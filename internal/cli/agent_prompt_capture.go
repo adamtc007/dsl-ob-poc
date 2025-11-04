@@ -40,7 +40,9 @@ func RunAgentPromptCapture(ctx context.Context, ds datastore.DataStore, ai *agen
 		text := fmt.Sprintf(format, args...)
 		fmt.Print(text)
 		if outputFile != nil {
-			outputFile.WriteString(text)
+			if _, err := outputFile.WriteString(text); err != nil {
+				log.Printf("Warning: Failed to write to output file: %v", err)
+			}
 		}
 	}
 
@@ -414,18 +416,4 @@ Provide a comprehensive validation assessment including errors, warnings, and su
 	}
 
 	return nil
-}
-
-// Helper function to safely convert context to JSON string
-func jsonString(v interface{}) string {
-	if v == nil {
-		return "{}"
-	}
-
-	data, err := json.Marshal(v)
-	if err != nil {
-		return "{}"
-	}
-
-	return string(data)
 }

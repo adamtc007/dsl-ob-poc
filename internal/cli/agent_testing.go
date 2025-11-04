@@ -75,9 +75,9 @@ func RunAgentTest(ctx context.Context, ds datastore.DataStore, args []string) er
 			fmt.Printf("📦 Products: %v\n", scenario.products)
 			fmt.Printf("📋 Description: %s\n", scenario.description)
 
-			kycReqs, err := mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
-			if err != nil {
-				fmt.Printf("❌ Error: %v\n\n", err)
+			kycReqs, callErr := mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
+			if callErr != nil {
+				fmt.Printf("❌ Error: %v\n\n", callErr)
 				continue
 			}
 
@@ -114,9 +114,9 @@ func RunAgentTest(ctx context.Context, ds datastore.DataStore, args []string) er
 				},
 			}
 
-			response, err := mockAgent.CallDSLTransformationAgent(ctx, request)
-			if err != nil {
-				fmt.Printf("❌ Error: %v\n\n", err)
+			response, transformErr := mockAgent.CallDSLTransformationAgent(ctx, request)
+			if transformErr != nil {
+				fmt.Printf("❌ Error: %v\n\n", transformErr)
 				continue
 			}
 
@@ -127,11 +127,11 @@ func RunAgentTest(ctx context.Context, ds datastore.DataStore, args []string) er
 			fmt.Printf("   📄 **New DSL Preview:**\n")
 
 			// Show first few lines of transformed DSL
-			lines := fmt.Sprintf("%s", response.NewDSL)
-			if len(lines) > 200 {
-				fmt.Printf("      %s...\n", lines[:200])
+			dslText := response.NewDSL
+			if len(dslText) > 200 {
+				fmt.Printf("      %s...\n", dslText[:200])
 			} else {
-				fmt.Printf("      %s\n", lines)
+				fmt.Printf("      %s\n", dslText)
 			}
 			fmt.Println()
 		}
@@ -142,9 +142,9 @@ func RunAgentTest(ctx context.Context, ds datastore.DataStore, args []string) er
 		fmt.Printf("✅ **Testing DSL Validation Agent**\n")
 		fmt.Printf("==================================\n")
 
-		validation, err := mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
-		if err != nil {
-			return fmt.Errorf("validation failed: %w", err)
+		validation, validateErr := mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
+		if validateErr != nil {
+			return fmt.Errorf("validation failed: %w", validateErr)
 		}
 
 		fmt.Printf("📊 **Validation Results:**\n")
