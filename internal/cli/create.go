@@ -8,6 +8,7 @@ import (
 	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
 	"dsl-ob-poc/internal/mocks"
+	"dsl-ob-poc/internal/shared-dsl/session"
 	"dsl-ob-poc/internal/store"
 )
 
@@ -29,17 +30,28 @@ func RunCreate(ctx context.Context, ds datastore.DataStore, args []string) error
 		return fmt.Errorf("failed to get mock data: %w", err)
 	}
 
-	// Create onboarding session
-	session, err := ds.CreateOnboardingSession(ctx, mockCBU.CBUId)
+	// Create onboarding session in database
+	dbSession, err := ds.CreateOnboardingSession(ctx, mockCBU.CBUId)
 	if err != nil {
 		return fmt.Errorf("failed to create onboarding session: %w", err)
 	}
 
-	// Generate the initial "CREATE" DSL
+	// Create DSL session manager and accumulate DSL (single source of truth)
+	sessionMgr := session.NewManager()
+	sess := sessionMgr.GetOrCreate(mockCBU.CBUId, "onboarding")
+
+	// Generate the initial "CREATE" DSL through builder
 	newDSL := dsl.CreateCase(mockCBU.CBUId, mockCBU.NaturePurpose)
 
-	// Insert DSL with initial CREATED state
-	versionID, err := ds.InsertDSLWithState(ctx, mockCBU.CBUId, newDSL, store.StateCreated)
+	// Accumulate DSL through state manager
+	err = sess.AccumulateDSL(newDSL)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate DSL: %w", err)
+	}
+
+	// Get final DSL from state manager and save to database
+	finalDSL := sess.GetDSL()
+	versionID, err := ds.InsertDSLWithState(ctx, mockCBU.CBUId, finalDSL, store.StateCreated)
 	if err != nil {
 		return fmt.Errorf("failed to save new case: %w", err)
 	}
@@ -50,10 +62,10 @@ func RunCreate(ctx context.Context, ds datastore.DataStore, args []string) error
 		return fmt.Errorf("failed to update onboarding state: %w", err)
 	}
 
-	fmt.Printf("✅ Created new case with onboarding session: %s\n", session.OnboardingID)
-	fmt.Printf("📝 DSL version (v%d) in state %s: %s\n", session.CurrentVersion, store.StateCreated, versionID)
+	fmt.Printf("✅ Created new case with onboarding session: %s\n", dbSession.OnboardingID)
+	fmt.Printf("📝 DSL version (v%d) in state %s: %s\n", dbSession.CurrentVersion, store.StateCreated, versionID)
 	fmt.Println("---")
-	fmt.Println(newDSL)
+	fmt.Println(finalDSL)
 	fmt.Println("---")
 
 	return nil

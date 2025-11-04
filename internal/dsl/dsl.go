@@ -1,3 +1,16 @@
+// DEPRECATED: This file is marked for deletion as part of multi-domain migration.
+//
+// Migration Status: Phase 4 - Create Onboarding Domain
+// New Location: internal/domains/onboarding/builder.go
+// Deprecation Date: 2024-01-XX
+// Planned Deletion: After Phase 6 complete and all tests passing
+//
+// DO NOT MODIFY THIS FILE - It is kept for reference and regression testing only.
+// See MIGRATION_DEPRECATION_TRACKER.md for details.
+//
+// This file contains DSL builder functions for onboarding workflows that will be
+// migrated to the new domain-specific builder system.
+
 package dsl
 
 import (

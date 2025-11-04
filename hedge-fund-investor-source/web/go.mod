@@ -1,8 +1,11 @@
 module dsl-ob-poc/hedge-fund-investor-source/web
 
-go 1.24.0
+go 1.25.1
+
+replace dsl-ob-poc => ../../
 
 require (
+	dsl-ob-poc v0.0.0-00010101000000-000000000000
 	github.com/google/generative-ai-go v0.20.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1

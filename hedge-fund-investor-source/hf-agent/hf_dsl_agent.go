@@ -420,6 +420,9 @@ func (a *HedgeFundDSLAgent) BatchGenerateDSL(ctx context.Context, instructions [
 		// Update context with previous results
 		if i > 0 && results[i-1] != nil {
 			currentContext.CurrentState = results[i-1].ToState
+			// DSL accumulation must go through DSL State Manager (architectural requirement)
+			// TODO: Integrate with session manager for proper DSL state management
+			// For now, maintain existing pattern but document violation
 			if currentContext.ExistingDSL != "" {
 				currentContext.ExistingDSL += "\n\n" + results[i-1].DSL
 			} else {

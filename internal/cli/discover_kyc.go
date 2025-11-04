@@ -10,6 +10,7 @@ import (
 	"dsl-ob-poc/internal/agent"
 	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
+	"dsl-ob-poc/internal/shared-dsl/session"
 	"dsl-ob-poc/internal/store"
 )
 
@@ -32,8 +33,8 @@ func RunDiscoverKYC(ctx context.Context, ds datastore.DataStore, ai *agent.Agent
 
 	log.Printf("Starting KYC discovery (Agent Step 3) for CBU: %s", *cbuID)
 
-	// 1. Get the current onboarding session
-	session, err := ds.GetOnboardingSession(ctx, *cbuID)
+	// 1. Get the current onboarding session (for validation)
+	_, err := ds.GetOnboardingSession(ctx, *cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to get onboarding session for CBU %s: %w", *cbuID, err)
 	}
@@ -80,7 +81,7 @@ func RunDiscoverKYC(ctx context.Context, ds datastore.DataStore, ai *agent.Agent
 	// 5. Calculate the "delta" and generate the new DSL
 	// This is the core reconciliation logic for KYC.
 	// We pass both the old and new requirements to the DSL generator.
-	newDSL, diff, err := dsl.AddOrModifyKYCBlock(currentDSL, *existingReqs, *newReqs)
+	newDSLFragment, diff, err := dsl.AddOrModifyKYCBlock("", *existingReqs, *newReqs)
 	if err != nil {
 		return fmt.Errorf("failed to generate new DSL: %w", err)
 	}
@@ -97,8 +98,25 @@ func RunDiscoverKYC(ctx context.Context, ds datastore.DataStore, ai *agent.Agent
 		strings.Join(diff.AddedJuris, ","),
 		strings.Join(diff.RemovedJuris, ","))
 
-	// 6. Save the new DSL with KYC_DISCOVERED state
-	versionID, err := ds.InsertDSLWithState(ctx, *cbuID, newDSL, store.StateKYCDiscovered)
+	// 6. Create DSL session manager and accumulate DSL (single source of truth)
+	sessionMgr := session.NewManager()
+	dslSession := sessionMgr.GetOrCreate(*cbuID, "onboarding")
+
+	// Accumulate current DSL
+	err = dslSession.AccumulateDSL(currentDSL)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate current DSL: %w", err)
+	}
+
+	// Accumulate KYC discovery DSL
+	err = dslSession.AccumulateDSL(newDSLFragment)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate KYC DSL: %w", err)
+	}
+
+	// Get final DSL from state manager and save to database
+	finalDSL := dslSession.GetDSL()
+	versionID, err := ds.InsertDSLWithState(ctx, *cbuID, finalDSL, store.StateKYCDiscovered)
 	if err != nil {
 		return fmt.Errorf("failed to save new DSL version: %w", err)
 	}
@@ -110,9 +128,9 @@ func RunDiscoverKYC(ctx context.Context, ds datastore.DataStore, ai *agent.Agent
 	}
 
 	fmt.Printf("🔍 Updated case from %s to %s\n", currentDSLState.OnboardingState, store.StateKYCDiscovered)
-	fmt.Printf("📝 DSL version (v%d): %s\n", session.CurrentVersion+1, versionID)
+	fmt.Printf("📝 DSL version: %s\n", versionID)
 	fmt.Println("---")
-	fmt.Println(newDSL)
+	fmt.Println(finalDSL)
 	fmt.Println("---")
 
 	return nil

@@ -9,6 +9,7 @@ import (
 
 	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
+	"dsl-ob-poc/internal/shared-dsl/session"
 )
 
 // looksLikeUUID checks if a string looks like a UUID
@@ -78,10 +79,25 @@ func RunGetAttributeValues(ctx context.Context, ds datastore.DataStore, args []s
 		}
 	}
 
-	// 5) Emit a new DSL version with a `(valueds.bind ...)` block
-	bind := dsl.RenderBindings(assignments)
-	finalDSL := norm + "\n\n" + bind
+	// 5) Create session manager and accumulate DSL (single source of truth)
+	sessionMgr := session.NewManager()
+	sess := sessionMgr.GetOrCreate(*cbuID, "onboarding")
 
+	// Accumulate current DSL
+	err = sess.AccumulateDSL(norm)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate current DSL: %w", err)
+	}
+
+	// 6) Generate and accumulate binding DSL through state manager
+	bind := dsl.RenderBindings(assignments)
+	err = sess.AccumulateDSL(bind)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate binding DSL: %w", err)
+	}
+
+	// 7) Get final DSL from state manager and save to database
+	finalDSL := sess.GetDSL()
 	versionID, err := ds.InsertDSL(ctx, *cbuID, finalDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save final DSL: %w", err)

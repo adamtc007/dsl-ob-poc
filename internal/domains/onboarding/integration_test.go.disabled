@@ -1,0 +1,641 @@
+package onboarding
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	registry "dsl-ob-poc/internal/domain-registry"
+	"dsl-ob-poc/internal/shared-dsl/parser"
+	"dsl-ob-poc/internal/shared-dsl/resolver"
+	"dsl-ob-poc/internal/shared-dsl/session"
+)
+
+// TestOnboardingDomainRegistryIntegration tests the onboarding domain integration with the registry
+func TestOnboardingDomainRegistryIntegration(t *testing.T) {
+	// Create registry and register onboarding domain
+	reg := registry.NewRegistry()
+	onboardingDomain := NewDomain()
+
+	err := reg.Register(onboardingDomain)
+	if err != nil {
+		t.Fatalf("Failed to register onboarding domain: %v", err)
+	}
+
+	// Test domain lookup
+	domain, err := reg.Get("onboarding")
+	if err != nil {
+		t.Fatalf("Failed to get onboarding domain: %v", err)
+	}
+
+	if domain.Name() != "onboarding" {
+		t.Errorf("Expected domain name 'onboarding', got '%s'", domain.Name())
+	}
+
+	// Test vocabulary retrieval through registry
+	vocab := reg.GetVocabulary("onboarding")
+	if vocab == nil {
+		t.Fatal("Failed to get vocabulary through registry")
+	}
+
+	if len(vocab.Verbs) != 68 {
+		t.Errorf("Expected 68 verbs through registry, got %d", len(vocab.Verbs))
+	}
+
+	// Test domain listing
+	domains := reg.List()
+	found := false
+	for _, d := range domains {
+		if d.Name() == "onboarding" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Onboarding domain not found in registry list")
+	}
+
+	// Test health check
+	if !domain.IsHealthy() {
+		t.Error("Onboarding domain should be healthy")
+	}
+
+	// Test metrics
+	metrics := domain.GetMetrics()
+	if metrics == nil {
+		t.Error("Expected metrics from onboarding domain")
+	}
+	if metrics.TotalVerbs != 68 {
+		t.Errorf("Expected 68 verbs in metrics, got %d", metrics.TotalVerbs)
+	}
+}
+
+// TestOnboardingDomainRouterIntegration tests the onboarding domain integration with the router
+func TestOnboardingDomainRouterIntegration(t *testing.T) {
+	// Setup registry with onboarding domain
+	reg := registry.NewRegistry()
+	onboardingDomain := NewDomain()
+
+	err := reg.Register(onboardingDomain)
+	if err != nil {
+		t.Fatalf("Failed to register onboarding domain: %v", err)
+	}
+
+	// Create router
+	r := registry.NewRouter(reg)
+
+	testCases := []struct {
+		name           string
+		instruction    string
+		context        map[string]interface{}
+		expectedDomain string
+		shouldRoute    bool
+	}{
+		{
+			name:           "ExplicitSwitchToOnboarding",
+			instruction:    "switch to onboarding domain",
+			expectedDomain: "onboarding",
+			shouldRoute:    true,
+		},
+		{
+			name:           "OnboardingKeyword",
+			instruction:    "create case for client onboarding",
+			expectedDomain: "onboarding",
+			shouldRoute:    true,
+		},
+		{
+			name:           "OnboardingVerbInInstruction",
+			instruction:    "I need to add products to the case",
+			expectedDomain: "onboarding",
+			shouldRoute:    true,
+		},
+		{
+			name:        "OnboardingContextCBUID",
+			instruction: "update the current case status",
+			context: map[string]interface{}{
+				"cbu_id": "CBU-1234",
+			},
+			expectedDomain: "onboarding",
+			shouldRoute:    true,
+		},
+		{
+			name:        "OnboardingStateInContext",
+			instruction: "proceed to next step",
+			context: map[string]interface{}{
+				"current_state": "KYC_STARTED",
+			},
+			expectedDomain: "onboarding",
+			shouldRoute:    true,
+		},
+		{
+			name:           "DSLVerbRouting",
+			instruction:    "(case.create (cbu.id \"CBU-1234\") (nature-purpose \"Test\"))",
+			expectedDomain: "onboarding",
+			shouldRoute:    true,
+		},
+		{
+			name:        "UnrelatedInstruction",
+			instruction: "what's the weather like today?",
+			shouldRoute: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			request := &registry.RoutingRequest{
+				Instruction: tc.instruction,
+				Context:     tc.context,
+			}
+
+			response, err := r.Route(request)
+
+			if !tc.shouldRoute {
+				if err == nil {
+					t.Error("Expected routing to fail for unrelated instruction")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Expected successful routing, got error: %v", err)
+			}
+
+			if response.Domain.Name() != tc.expectedDomain {
+				t.Errorf("Expected domain '%s', got '%s'",
+					tc.expectedDomain, response.Domain.Name())
+			}
+
+			if response.Strategy == "" {
+				t.Error("Expected routing strategy to be set")
+			}
+
+			if response.Confidence <= 0 {
+				t.Error("Expected positive routing confidence")
+			}
+		})
+	}
+}
+
+// TestOnboardingVerbsInParser tests that onboarding verbs are recognized by the DSL parser
+func TestOnboardingVerbsInParser(t *testing.T) {
+	// Create shared DSL components
+	p := parser.NewParser()
+
+	onboardingVerbs := []string{
+		"case.create", "case.update", "case.validate", "case.approve", "case.close",
+		"entity.register", "entity.classify", "entity.link", "identity.verify", "identity.attest",
+		"products.add", "products.configure", "services.discover", "services.provision", "services.activate",
+		"kyc.start", "kyc.collect", "kyc.verify", "kyc.assess", "compliance.screen", "compliance.monitor",
+		"resources.plan", "resources.provision", "resources.configure", "resources.test", "resources.deploy",
+		"attributes.define", "attributes.resolve", "values.bind", "values.validate", "values.encrypt",
+		"workflow.transition", "workflow.gate", "tasks.create", "tasks.assign", "tasks.complete",
+		"notify.send", "communicate.request", "escalate.trigger", "audit.log",
+		"external.query", "external.sync", "api.call", "webhook.register",
+	}
+
+	for _, verb := range onboardingVerbs {
+		dsl := fmt.Sprintf("(%s (param \"value\"))", verb)
+
+		ast, err := p.Parse(dsl)
+		if err != nil {
+			t.Errorf("Parser failed to parse onboarding verb '%s': %v", verb, err)
+			continue
+		}
+
+		if len(ast.Statements) == 0 {
+			t.Errorf("Parser returned empty AST for verb '%s'", verb)
+			continue
+		}
+
+		// Extract verb from AST
+		extractedVerbs := p.ExtractVerbs(ast)
+		if len(extractedVerbs) == 0 {
+			t.Errorf("Parser failed to extract verb '%s'", verb)
+			continue
+		}
+
+		found := false
+		for _, extracted := range extractedVerbs {
+			if extracted == verb {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("Parser didn't properly extract verb '%s', got: %v", verb, extractedVerbs)
+		}
+	}
+}
+
+// TestOnboardingSessionIntegration tests onboarding domain with session manager
+func TestOnboardingSessionIntegration(t *testing.T) {
+	// Create session manager
+	sessionMgr := session.NewManager()
+
+	// Create test session
+	sessionID := "test-onboarding-session"
+	session, err := sessionMgr.CreateSession(sessionID)
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	domain := NewDomain()
+
+	// Test DSL accumulation through session
+	dslSteps := []string{
+		`(case.create (cbu.id "CBU-SESSION-TEST") (nature-purpose "Session integration test"))`,
+		`(products.add "CUSTODY" "FUND_ACCOUNTING")`,
+		`(kyc.start (requirements (document "CertificateOfIncorporation")))`,
+	}
+
+	for i, dsl := range dslSteps {
+		// Add DSL to session
+		err = session.AddDSL(dsl)
+		if err != nil {
+			t.Fatalf("Step %d: Failed to add DSL to session: %v", i+1, err)
+		}
+
+		// Get accumulated DSL
+		accumulatedDSL := session.GetAccumulatedDSL()
+
+		// Validate accumulated DSL
+		err = domain.ValidateVerbs(accumulatedDSL)
+		if err != nil {
+			t.Errorf("Step %d: Accumulated DSL validation failed: %v", i+1, err)
+		}
+
+		// Extract context from accumulated DSL
+		context, err := domain.ExtractContext(accumulatedDSL)
+		if err != nil {
+			t.Errorf("Step %d: Context extraction failed: %v", i+1, err)
+		}
+
+		// Verify context has expected keys
+		if context["cbu_id"] != "CBU-SESSION-TEST" {
+			t.Errorf("Step %d: Expected CBU ID in context", i+1)
+		}
+	}
+
+	// Verify final state
+	finalDSL := session.GetAccumulatedDSL()
+	context, _ := domain.ExtractContext(finalDSL)
+
+	if context["current_state"] != "KYC_STARTED" {
+		t.Errorf("Expected final state 'KYC_STARTED', got '%v'", context["current_state"])
+	}
+}
+
+// TestOnboardingUUIDResolution tests UUID resolution in onboarding context
+func TestOnboardingUUIDResolution(t *testing.T) {
+	r := resolver.NewUUIDResolver()
+	domain := NewDomain()
+
+	// Test DSL with placeholders
+	dslWithPlaceholders := `(case.create (cbu.id "<cbu_id>") (nature-purpose "Test with placeholders"))
+(entity.register (type "CORPORATE") (jurisdiction "US"))
+(resources.plan (resource.create "Account" (owner "Provider") (var (attr-id "<attr_id>"))))`
+
+	// Create context with placeholder values
+	context := map[string]interface{}{
+		"cbu_id":  "CBU-RESOLVED-1234",
+		"attr_id": "attr-uuid-resolved-5678",
+	}
+
+	// Resolve placeholders
+	resolvedDSL, err := r.ResolvePlaceholders(dslWithPlaceholders, context)
+	if err != nil {
+		t.Fatalf("Failed to resolve placeholders: %v", err)
+	}
+
+	// Verify resolution worked
+	if strings.Contains(resolvedDSL, "<cbu_id>") {
+		t.Error("CBU ID placeholder was not resolved")
+	}
+	if strings.Contains(resolvedDSL, "<attr_id>") {
+		t.Error("Attribute ID placeholder was not resolved")
+	}
+
+	// Verify resolved DSL is valid
+	err = domain.ValidateVerbs(resolvedDSL)
+	if err != nil {
+		t.Errorf("Resolved DSL validation failed: %v", err)
+	}
+
+	// Extract context from resolved DSL
+	extractedContext, err := domain.ExtractContext(resolvedDSL)
+	if err != nil {
+		t.Errorf("Failed to extract context from resolved DSL: %v", err)
+	}
+
+	if extractedContext["cbu_id"] != "CBU-RESOLVED-1234" {
+		t.Errorf("Expected resolved CBU ID in extracted context")
+	}
+}
+
+// TestMultiDomainCoexistence tests onboarding domain alongside other domains
+func TestMultiDomainCoexistence(t *testing.T) {
+	// This test would normally include hedge-fund-investor domain as well
+	// For now, we'll create a mock second domain
+	reg := registry.NewRegistry()
+
+	// Register onboarding domain
+	onboardingDomain := NewDomain()
+	err := reg.Register(onboardingDomain)
+	if err != nil {
+		t.Fatalf("Failed to register onboarding domain: %v", err)
+	}
+
+	// Create router
+	r := registry.NewRouter(reg)
+
+	// Test that onboarding-specific instructions route to onboarding
+	onboardingRequest := &registry.RoutingRequest{
+		Instruction: "create case for new client onboarding",
+		Context:     nil,
+	}
+
+	response, err := r.Route(onboardingRequest)
+	if err != nil {
+		t.Fatalf("Failed to route onboarding request: %v", err)
+	}
+
+	if response.Domain.Name() != "onboarding" {
+		t.Errorf("Expected onboarding domain, got '%s'", response.Domain.Name())
+	}
+
+	// Test vocabulary separation
+	onboardingVocab := reg.GetVocabulary("onboarding")
+	if onboardingVocab == nil {
+		t.Fatal("Failed to get onboarding vocabulary")
+	}
+
+	// Verify onboarding-specific verbs exist
+	onboardingSpecificVerbs := []string{"case.create", "products.add", "resources.plan"}
+	for _, verb := range onboardingSpecificVerbs {
+		if _, exists := onboardingVocab.Verbs[verb]; !exists {
+			t.Errorf("Onboarding-specific verb '%s' not found", verb)
+		}
+	}
+
+	// Test registry metrics
+	metrics := reg.GetMetrics()
+	if metrics.TotalDomains != 1 {
+		t.Errorf("Expected 1 domain registered, got %d", metrics.TotalDomains)
+	}
+
+	if metrics.HealthyDomains != 1 {
+		t.Errorf("Expected 1 healthy domain, got %d", metrics.HealthyDomains)
+	}
+}
+
+// TestCompleteOnboardingWorkflowIntegration tests a complete onboarding workflow through all components
+func TestCompleteOnboardingWorkflowIntegration(t *testing.T) {
+	// Setup all components
+	reg := registry.NewRegistry()
+	onboardingDomain := NewDomain()
+	reg.Register(onboardingDomain)
+
+	r := registry.NewRouter(reg)
+	sessionMgr := session.NewManager()
+	uuidResolver := resolver.NewUUIDResolver()
+	p := parser.NewParser()
+
+	// Create session
+	sessionID := "complete-workflow-test"
+	session, err := sessionMgr.CreateSession(sessionID)
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	// Workflow steps with natural language instructions
+	workflowSteps := []struct {
+		instruction   string
+		expectedVerb  string
+		expectedState string
+	}{
+		{
+			instruction:   "create case CBU-INTEGRATION-TEST for UCITS fund",
+			expectedVerb:  "case.create",
+			expectedState: "CREATE",
+		},
+		{
+			instruction:   "add custody and fund accounting products",
+			expectedVerb:  "products.add",
+			expectedState: "PRODUCTS_ADDED",
+		},
+		{
+			instruction:   "start kyc process",
+			expectedVerb:  "kyc.start",
+			expectedState: "KYC_STARTED",
+		},
+		{
+			instruction:   "discover services for custody product",
+			expectedVerb:  "services.discover",
+			expectedState: "SERVICES_DISCOVERED",
+		},
+		{
+			instruction:   "plan required resources",
+			expectedVerb:  "resources.plan",
+			expectedState: "RESOURCES_PLANNED",
+		},
+	}
+
+	for i, step := range workflowSteps {
+		t.Logf("Step %d: %s", i+1, step.instruction)
+
+		// 1. Route instruction to appropriate domain
+		routingReq := &registry.RoutingRequest{
+			Instruction: step.instruction,
+			Context:     session.GetContext(),
+		}
+
+		routingResp, err := r.Route(routingReq)
+		if err != nil {
+			t.Fatalf("Step %d: Routing failed: %v", i+1, err)
+		}
+
+		if routingResp.Domain.Name() != "onboarding" {
+			t.Errorf("Step %d: Expected onboarding domain, got '%s'",
+				i+1, routingResp.Domain.Name())
+		}
+
+		// 2. Generate DSL from natural language
+		genReq := &registry.GenerationRequest{
+			Instruction: step.instruction,
+			Context:     session.GetContext(),
+		}
+
+		genResp, err := onboardingDomain.GenerateDSL(context.Background(), genReq)
+		if err != nil {
+			t.Fatalf("Step %d: DSL generation failed: %v", i+1, err)
+		}
+
+		// 3. Parse generated DSL
+		ast, err := p.Parse(genResp.DSL)
+		if err != nil {
+			t.Errorf("Step %d: DSL parsing failed: %v", i+1, err)
+			continue
+		}
+
+		// 4. Validate DSL contains expected verb
+		extractedVerbs := p.ExtractVerbs(ast)
+		verbFound := false
+		for _, verb := range extractedVerbs {
+			if verb == step.expectedVerb {
+				verbFound = true
+				break
+			}
+		}
+		if !verbFound {
+			t.Errorf("Step %d: Expected verb '%s' not found in generated DSL: %s",
+				i+1, step.expectedVerb, genResp.DSL)
+		}
+
+		// 5. Add DSL to session
+		err = session.AddDSL(genResp.DSL)
+		if err != nil {
+			t.Errorf("Step %d: Failed to add DSL to session: %v", i+1, err)
+		}
+
+		// 6. Extract context and validate state progression
+		accumulatedDSL := session.GetAccumulatedDSL()
+		context, err := onboardingDomain.ExtractContext(accumulatedDSL)
+		if err != nil {
+			t.Errorf("Step %d: Context extraction failed: %v", i+1, err)
+		}
+
+		if context["current_state"] != step.expectedState {
+			t.Errorf("Step %d: Expected state '%s', got '%v'",
+				i+1, step.expectedState, context["current_state"])
+		}
+
+		// 7. Update session context
+		for key, value := range context {
+			session.SetContext(key, value)
+		}
+	}
+
+	// Verify complete workflow
+	finalDSL := session.GetAccumulatedDSL()
+	if finalDSL == "" {
+		t.Error("Expected accumulated DSL in session")
+	}
+
+	// Final validation
+	err = onboardingDomain.ValidateVerbs(finalDSL)
+	if err != nil {
+		t.Errorf("Final DSL validation failed: %v", err)
+	}
+
+	// Verify all expected verbs are present
+	expectedVerbs := []string{"case.create", "products.add", "kyc.start", "services.discover", "resources.plan"}
+	for _, expectedVerb := range expectedVerbs {
+		if !strings.Contains(finalDSL, expectedVerb) {
+			t.Errorf("Final DSL missing expected verb: %s", expectedVerb)
+		}
+	}
+
+	t.Logf("Complete workflow integration test successful. Final DSL length: %d characters", len(finalDSL))
+}
+
+// TestOnboardingErrorHandling tests error handling across component integration
+func TestOnboardingErrorHandling(t *testing.T) {
+	reg := registry.NewRegistry()
+	onboardingDomain := NewDomain()
+	reg.Register(onboardingDomain)
+
+	// Test invalid DSL validation
+	invalidDSL := "(invalid.verb (param \"value\"))"
+	err := onboardingDomain.ValidateVerbs(invalidDSL)
+	if err == nil {
+		t.Error("Expected validation error for invalid DSL")
+	}
+
+	// Test invalid state transition
+	err = onboardingDomain.ValidateStateTransition("CREATE", "COMPLETE")
+	if err == nil {
+		t.Error("Expected error for invalid state transition")
+	}
+
+	// Test empty DSL generation request
+	ctx := context.Background()
+	_, err = onboardingDomain.GenerateDSL(ctx, nil)
+	if err == nil {
+		t.Error("Expected error for nil generation request")
+	}
+
+	// Test unsupported instruction
+	genReq := &registry.GenerationRequest{
+		Instruction: "completely unsupported random instruction xyz",
+	}
+	_, err = onboardingDomain.GenerateDSL(ctx, genReq)
+	if err == nil {
+		t.Error("Expected error for unsupported instruction")
+	}
+
+	// Test context extraction with invalid DSL format
+	_, err = onboardingDomain.ExtractContext("not valid dsl at all")
+	if err != nil {
+		t.Errorf("Context extraction should not fail for malformed DSL, got: %v", err)
+	}
+}
+
+// TestOnboardingPerformance tests performance characteristics of onboarding domain
+func TestOnboardingPerformance(t *testing.T) {
+	domain := NewDomain()
+
+	// Test vocabulary access performance
+	start := time.Now()
+	for i := 0; i < 1000; i++ {
+		vocab := domain.GetVocabulary()
+		if len(vocab.Verbs) != 68 {
+			t.Error("Vocabulary corruption detected in performance test")
+		}
+	}
+	vocabDuration := time.Since(start)
+
+	if vocabDuration > time.Millisecond*100 {
+		t.Errorf("Vocabulary access too slow: %v", vocabDuration)
+	}
+
+	// Test DSL validation performance
+	testDSL := `(case.create (cbu.id "CBU-PERF-TEST") (nature-purpose "Performance test"))
+(products.add "CUSTODY" "FUND_ACCOUNTING")
+(kyc.start (requirements (document "CertificateOfIncorporation")))`
+
+	start = time.Now()
+	for i := 0; i < 1000; i++ {
+		err := domain.ValidateVerbs(testDSL)
+		if err != nil {
+			t.Errorf("Validation failed in performance test: %v", err)
+		}
+	}
+	validationDuration := time.Since(start)
+
+	if validationDuration > time.Millisecond*500 {
+		t.Errorf("DSL validation too slow: %v", validationDuration)
+	}
+
+	// Test context extraction performance
+	start = time.Now()
+	for i := 0; i < 1000; i++ {
+		context, err := domain.ExtractContext(testDSL)
+		if err != nil {
+			t.Errorf("Context extraction failed in performance test: %v", err)
+		}
+		if context["cbu_id"] != "CBU-PERF-TEST" {
+			t.Error("Context extraction corruption in performance test")
+		}
+	}
+	contextDuration := time.Since(start)
+
+	if contextDuration > time.Millisecond*200 {
+		t.Errorf("Context extraction too slow: %v", contextDuration)
+	}
+
+	t.Logf("Performance test results: vocab=%v, validation=%v, context=%v",
+		vocabDuration, validationDuration, contextDuration)
+}

@@ -8,6 +8,7 @@ import (
 
 	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
+	"dsl-ob-poc/internal/shared-dsl/session"
 )
 
 // RunPopulateAttributes implements the 6th state of the onboarding DSL:
@@ -47,13 +48,30 @@ func RunPopulateAttributes(ctx context.Context, ds datastore.DataStore, args []s
 	}
 	log.Printf("Successfully populated %d attribute values", len(populatedValues))
 
-	// Generate final DSL with populated values
-	finalDSL, err := dsl.AddPopulatedAttributes(currentDSL, populatedValues)
+	// Create DSL session manager and accumulate DSL (single source of truth)
+	sessionMgr := session.NewManager()
+	dslSession := sessionMgr.GetOrCreate(*cbuID, "onboarding")
+
+	// Accumulate current DSL
+	err = dslSession.AccumulateDSL(currentDSL)
 	if err != nil {
-		return fmt.Errorf("failed to generate final DSL: %w", err)
+		return fmt.Errorf("failed to accumulate current DSL: %w", err)
 	}
 
-	// Save the final DSL version
+	// Generate populated attributes DSL fragment
+	populatedFragment, err := dsl.AddPopulatedAttributes("", populatedValues)
+	if err != nil {
+		return fmt.Errorf("failed to generate populated attributes: %w", err)
+	}
+
+	// Accumulate populated attributes through state manager
+	err = dslSession.AccumulateDSL(populatedFragment)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate populated attributes: %w", err)
+	}
+
+	// Get final DSL from state manager and save to database
+	finalDSL := dslSession.GetDSL()
 	versionID, err := ds.InsertDSL(ctx, *cbuID, finalDSL)
 	if err != nil {
 		return fmt.Errorf("failed to save final DSL: %w", err)

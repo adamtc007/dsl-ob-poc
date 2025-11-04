@@ -9,6 +9,7 @@ import (
 	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dictionary"
 	"dsl-ob-poc/internal/dsl"
+	"dsl-ob-poc/internal/shared-dsl/session"
 	"dsl-ob-poc/internal/store"
 )
 
@@ -27,8 +28,8 @@ func RunDiscoverResources(ctx context.Context, ds datastore.DataStore, args []st
 
 	log.Printf("Starting resource discovery (Step 5) for CBU: %s", *cbuID)
 
-	// 1. Get the current onboarding session
-	session, err := ds.GetOnboardingSession(ctx, *cbuID)
+	// 1. Get the current onboarding session (for validation)
+	_, err := ds.GetOnboardingSession(ctx, *cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to get onboarding session for CBU %s: %w", *cbuID, err)
 	}
@@ -85,33 +86,50 @@ func RunDiscoverResources(ctx context.Context, ds datastore.DataStore, args []st
 	}
 	log.Printf("Discovery complete: found %d unique resources.", len(allResources))
 
-	// 4. Generate the new DSL with the discovered resources plan
+	// 4. Create DSL session manager and accumulate DSL (single source of truth)
+	sessionMgr := session.NewManager()
+	dslSession := sessionMgr.GetOrCreate(*cbuID, "onboarding")
+
+	// Accumulate current DSL
+	err = dslSession.AccumulateDSL(currentDSL)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate current DSL: %w", err)
+	}
+
+	// 5. Generate the resources discovery DSL fragment
 	plan := dsl.ResourceDiscoveryPlan{
 		ServiceResources:   serviceResourceMap,
 		ResourceAttributes: dictionaryAttributeMap,
 	}
 
-	newDSL, err := dsl.AddDiscoveredResources(currentDSL, plan)
+	resourcesDSL, err := dsl.AddDiscoveredResources("", plan)
 	if err != nil {
-		return fmt.Errorf("failed to generate new DSL: %w", err)
+		return fmt.Errorf("failed to generate resources DSL: %w", err)
 	}
 
-	// 5. Save the new DSL with RESOURCES_DISCOVERED state
-	versionID, err := ds.InsertDSLWithState(ctx, *cbuID, newDSL, store.StateResourcesDiscovered)
+	// Accumulate resources DSL through state manager
+	err = dslSession.AccumulateDSL(resourcesDSL)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate resources DSL: %w", err)
+	}
+
+	// 6. Get final DSL from state manager and save to database
+	finalDSL := dslSession.GetDSL()
+	versionID, err := ds.InsertDSLWithState(ctx, *cbuID, finalDSL, store.StateResourcesDiscovered)
 	if err != nil {
 		return fmt.Errorf("failed to save new DSL version: %w", err)
 	}
 
-	// 6. Update onboarding session state
+	// 7. Update onboarding session state
 	err = ds.UpdateOnboardingState(ctx, *cbuID, store.StateResourcesDiscovered, versionID)
 	if err != nil {
 		return fmt.Errorf("failed to update onboarding state: %w", err)
 	}
 
-	fmt.Printf("📦 Updated case from %s to %s\n", currentDSLState.OnboardingState, store.StateResourcesDiscovered)
-	fmt.Printf("📝 DSL version (v%d): %s\n", session.CurrentVersion+1, versionID)
+	fmt.Printf("🔍 Updated case from %s to %s\n", currentDSLState.OnboardingState, store.StateResourcesDiscovered)
+	fmt.Printf("📝 DSL version: %s\n", versionID)
 	fmt.Println("---")
-	fmt.Println(newDSL)
+	fmt.Println(finalDSL)
 	fmt.Println("---")
 
 	return nil

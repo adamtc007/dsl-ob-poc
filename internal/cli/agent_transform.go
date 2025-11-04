@@ -9,11 +9,13 @@ import (
 
 	"dsl-ob-poc/internal/agent"
 	"dsl-ob-poc/internal/datastore"
+	"dsl-ob-poc/internal/shared-dsl/session"
 	"dsl-ob-poc/internal/store"
 )
 
 // RunAgentTransform handles the 'agent-transform' command for AI-powered DSL transformations
 func RunAgentTransform(ctx context.Context, ds datastore.DataStore, ai *agent.Agent, args []string) error {
+	var finalDSL string
 	fs := flag.NewFlagSet("agent-transform", flag.ExitOnError)
 	cbuID := fs.String("cbu", "", "The CBU ID of the case to transform (required)")
 	instruction := fs.String("instruction", "", "Transformation instruction for the AI agent (required)")
@@ -35,8 +37,8 @@ func RunAgentTransform(ctx context.Context, ds datastore.DataStore, ai *agent.Ag
 	log.Printf("🤖 Starting AI-powered DSL transformation for CBU: %s", *cbuID)
 	log.Printf("📝 Instruction: %s", *instruction)
 
-	// 1. Get the current onboarding session and DSL
-	session, err := ds.GetOnboardingSession(ctx, *cbuID)
+	// 2. Get the current onboarding session (for validation)
+	_, err := ds.GetOnboardingSession(ctx, *cbuID)
 	if err != nil {
 		return fmt.Errorf("failed to get onboarding session for CBU %s: %w", *cbuID, err)
 	}
@@ -59,10 +61,9 @@ func RunAgentTransform(ctx context.Context, ds datastore.DataStore, ai *agent.Ag
 		Instruction: *instruction,
 		TargetState: finalTargetState,
 		Context: map[string]interface{}{
-			"current_state":   currentDSLState.OnboardingState,
-			"version_number":  currentDSLState.VersionNumber,
-			"onboarding_id":   session.OnboardingID,
-			"session_version": session.CurrentVersion,
+			"current_state":  currentDSLState.OnboardingState,
+			"version_number": currentDSLState.VersionNumber,
+			"cbu_id":         *cbuID,
 		},
 	}
 
@@ -92,9 +93,28 @@ func RunAgentTransform(ctx context.Context, ds datastore.DataStore, ai *agent.Ag
 	fmt.Println(currentDSLState.DSLText)
 	fmt.Printf("-------------------------------------------\n\n")
 
+	// Create DSL session manager and accumulate DSL (single source of truth)
+	sessionMgr := session.NewManager()
+	dslSession := sessionMgr.GetOrCreate(*cbuID, "onboarding")
+
+	// Accumulate current DSL
+	err = dslSession.AccumulateDSL(currentDSLState.DSLText)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate current DSL: %w", err)
+	}
+
+	// Accumulate transformed DSL from agent
+	err = dslSession.AccumulateDSL(response.NewDSL)
+	if err != nil {
+		return fmt.Errorf("failed to accumulate transformed DSL: %w", err)
+	}
+
+	// Get final DSL from state manager
+	finalDSL = dslSession.GetDSL()
+
 	fmt.Printf("✨ **Transformed DSL**:\n")
 	fmt.Printf("-------------------------------------------\n")
-	fmt.Println(response.NewDSL)
+	fmt.Println(finalDSL)
 	fmt.Printf("-------------------------------------------\n\n")
 
 	// 5. Optionally save the transformed DSL
@@ -109,7 +129,7 @@ func RunAgentTransform(ctx context.Context, ds datastore.DataStore, ai *agent.Ag
 			saveState = currentDSLState.OnboardingState
 		}
 
-		versionID, err := ds.InsertDSLWithState(ctx, *cbuID, response.NewDSL, saveState)
+		versionID, err := ds.InsertDSLWithState(ctx, *cbuID, finalDSL, saveState)
 		if err != nil {
 			return fmt.Errorf("failed to save transformed DSL: %w", err)
 		}
@@ -123,7 +143,7 @@ func RunAgentTransform(ctx context.Context, ds datastore.DataStore, ai *agent.Ag
 		fmt.Printf("✅ **Transformed DSL saved successfully**\n")
 		fmt.Printf("🆔 Version ID: %s\n", versionID)
 		fmt.Printf("🎯 State: %s\n", saveState)
-		fmt.Printf("📊 Version: %d\n", session.CurrentVersion+1)
+		fmt.Printf("📊 Final DSL: %d characters\n", len(finalDSL))
 	} else {
 		fmt.Printf("ℹ️  **Note**: Use --save flag to persist the transformed DSL to the database\n")
 	}
