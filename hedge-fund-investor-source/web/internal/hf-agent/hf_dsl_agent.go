@@ -158,16 +158,13 @@ When context is provided (investor_id, investor_name, fund_id, etc.), USE IT aut
 
 If context has investor_id but instruction mentions a DIFFERENT investor name, that's a NEW investor.
 
-# HEDGE FUND INVESTOR DSL VOCABULARY (18 VERBS)
+# HEDGE FUND INVESTOR DSL VOCABULARY (17 VERBS)
 
 ## 1. OPPORTUNITY MANAGEMENT
-- investor.start-opportunity: Create initial investor record
+- investor.start-opportunity: Create or update investor record (IDEMPOTENT)
   Args: legal-name (string), type (enum: INDIVIDUAL|CORPORATE|TRUST|FOHF|NOMINEE), domicile (string, optional), source (string, optional)
   State: → OPPORTUNITY
-
-- investor.amend-details: Update investor details (idempotent, partial update)
-  Args: investor (uuid), legal-name (string, optional), short-name (string, optional), domicile (string, optional), lei (string, optional), reg-number (string, optional), address-line1 (string, optional), address-line2 (string, optional), city (string, optional), country (string, optional), postal-code (string, optional), contact-name (string, optional), contact-email (string, optional), contact-phone (string, optional)
-  State: No state change (can be called anytime)
+  Note: Can be called multiple times to update investor details. If investor_id exists in context, updates that investor.
 
 - investor.record-indication: Record investment interest
   Args: investor (uuid), fund (uuid), class (uuid), ticket (decimal), currency (string)
@@ -324,13 +321,13 @@ AGENT:
 USER: "Set their domicile to UK" (with investor_id: "abc-123", investor_name: "adam cearns")
 AGENT:
 {
-  "dsl": "(investor.amend-details\n  :investor \"abc-123\"\n  :domicile \"UK\")",
-  "verb": "investor.amend-details",
-  "parameters": {"investor": "abc-123", "domicile": "UK"},
+  "dsl": "(investor.start-opportunity\n  :legal-name \"adam cearns\"\n  :type \"INDIVIDUAL\"\n  :domicile \"UK\")",
+  "verb": "investor.start-opportunity",
+  "parameters": {"legal-name": "adam cearns", "type": "INDIVIDUAL", "domicile": "UK", "investor": "abc-123"},
   "from_state": "OPPORTUNITY",
   "to_state": "OPPORTUNITY",
   "guard_conditions": [],
-  "explanation": "Updating domicile to UK for adam cearns",
+  "explanation": "Updating domicile to UK for adam cearns (idempotent update)",
   "confidence": 0.98,
   "warnings": []
 }
@@ -417,7 +414,7 @@ func validateDSLResponse(resp *DSLGenerationResponse) error {
 
 	// Check if verb is in approved vocabulary
 	validVerbs := []string{
-		"investor.start-opportunity", "investor.record-indication",
+		"investor.start-opportunity", "investor.record-indication", "investor.amend-details",
 		"kyc.begin", "kyc.collect-doc", "kyc.screen", "kyc.approve", "kyc.refresh-schedule",
 		"screen.continuous",
 		"tax.capture",
