@@ -400,6 +400,31 @@ make validate FILE=daily_subscriptions.json
 
 ---
 
-**Version**: v9 - Hedge Fund Investor Register
-**Last Updated**: November 2025
-**Production Ready**: ✅ Event sourcing, state machines, CLI tools, comprehensive testing
+**Version**: v10 - Hedge Fund Investor Register
+**Last Updated**: November 4, 2025
+**Production Ready**: ✅ Event sourcing, state machines, CLI tools, comprehensive testing, linter compliance
+
+## 🔧 Recent Updates (v10)
+
+### Code Quality & Compliance
+- ✅ **Linter Compliance**: All critical linter issues resolved with golangci-lint
+- ✅ **Test Coverage**: 100% test pass rate across all hedge fund modules
+- ✅ **Build Artifacts**: Clean git repository with proper .gitignore configuration
+- ✅ **CLI Validation**: Standalone `cmd/hf-cli` tool for DSL validation with pretty-print support
+
+### Validation & Testing
+```bash
+# Validate good runbooks
+make validate
+make validate FILE=examples/runbook.sample.json
+
+# Test error handling with intentionally bad runbooks
+make validate-bad
+make validate-bad BAD_FILE=examples/bad.runbook.json
+```
+
+### Quality Assurance
+- **Variable Shadowing**: Fixed in JSON unmarshaling and validation logic
+- **Printf Format**: Corrected newline handling in CLI usage output
+- **Error Wrapping**: Proper error wrapping with `fmt.Errorf` and `%w` verb
+- **Code Formatting**: Applied `gofmt` across entire codebase for consistency
