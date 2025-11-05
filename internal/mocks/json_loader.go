@@ -41,8 +41,8 @@ func (j *JSONDataLoader) loadJSONFile(filename string, target interface{}, requi
 		return fmt.Errorf("mock data file is empty: %s", filePath)
 	}
 
-	if err := json.Unmarshal(data, target); err != nil {
-		return fmt.Errorf("failed to unmarshal %s: %w (file path: %s)", filename, err, filePath)
+	if unmarshalErr := json.Unmarshal(data, target); unmarshalErr != nil {
+		return fmt.Errorf("failed to unmarshal %s: %w (file path: %s)", filename, unmarshalErr, filePath)
 	}
 
 	return nil
@@ -75,8 +75,8 @@ func (j *JSONDataLoader) LoadEntityTypes() ([]store.EntityType, error) {
 	}
 
 	var entityTypes []store.EntityType
-	if err := json.Unmarshal(data, &entityTypes); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal entity types: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &entityTypes); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal entity types: %w", unmarshalErr)
 	}
 
 	return entityTypes, nil
@@ -91,8 +91,8 @@ func (j *JSONDataLoader) LoadEntities() ([]store.Entity, error) {
 	}
 
 	var entities []store.Entity
-	if err := json.Unmarshal(data, &entities); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal entities: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &entities); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal entities: %w", unmarshalErr)
 	}
 
 	return entities, nil
@@ -107,8 +107,8 @@ func (j *JSONDataLoader) LoadLimitedCompanies() ([]store.LimitedCompany, error) 
 	}
 
 	var companies []store.LimitedCompany
-	if err := json.Unmarshal(data, &companies); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal limited companies: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &companies); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal limited companies: %w", unmarshalErr)
 	}
 
 	return companies, nil
@@ -123,8 +123,8 @@ func (j *JSONDataLoader) LoadPartnerships() ([]store.Partnership, error) {
 	}
 
 	var partnerships []store.Partnership
-	if err := json.Unmarshal(data, &partnerships); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal partnerships: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &partnerships); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal partnerships: %w", unmarshalErr)
 	}
 
 	return partnerships, nil
@@ -148,8 +148,8 @@ func (j *JSONDataLoader) LoadCBUEntityRoles() ([]store.CBUEntityRole, error) {
 	}
 
 	var relationships []store.CBUEntityRole
-	if err := json.Unmarshal(data, &relationships); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal CBU entity roles: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &relationships); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal CBU entity roles: %w", unmarshalErr)
 	}
 
 	return relationships, nil
@@ -182,8 +182,8 @@ func (j *JSONDataLoader) LoadProdResources() ([]store.ProdResource, error) {
 	}
 
 	var resources []store.ProdResource
-	if err := json.Unmarshal(data, &resources); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal prod resources: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &resources); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal prod resources: %w", unmarshalErr)
 	}
 
 	return resources, nil
@@ -204,8 +204,8 @@ func (j *JSONDataLoader) LoadProductServices() ([]ProductServiceRelation, error)
 	}
 
 	var relations []ProductServiceRelation
-	if err := json.Unmarshal(data, &relations); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal product services: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &relations); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal product services: %w", unmarshalErr)
 	}
 
 	return relations, nil
@@ -226,8 +226,8 @@ func (j *JSONDataLoader) LoadServiceResources() ([]ServiceResourceRelation, erro
 	}
 
 	var relations []ServiceResourceRelation
-	if err := json.Unmarshal(data, &relations); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal service resources: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &relations); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal service resources: %w", unmarshalErr)
 	}
 
 	return relations, nil
@@ -242,8 +242,8 @@ func (j *JSONDataLoader) LoadDictionary() ([]store.Attribute, error) {
 	}
 
 	var attributes []store.Attribute
-	if err := json.Unmarshal(data, &attributes); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal dictionary: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &attributes); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal dictionary: %w", unmarshalErr)
 	}
 
 	return attributes, nil
@@ -288,8 +288,8 @@ func (j *JSONDataLoader) LoadDSLRecords() ([]DSLRecord, error) {
 	}
 
 	var records []DSLRecord
-	if err := json.Unmarshal(data, &records); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal DSL records: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &records); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal DSL records: %w", unmarshalErr)
 	}
 
 	return records, nil

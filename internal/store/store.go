@@ -53,15 +53,15 @@ type ProdResource struct {
 
 // Attribute represents an attribute in the dictionary (v3 schema).
 type Attribute struct {
-	AttributeID     string
-	Name            string
-	LongDescription string
-	GroupID         string
-	Mask            string
-	Domain          string
-	Vector          string
-	Source          string // JSON string
-	Sink            string // JSON string
+	AttributeID     string `json:"attribute_id"`
+	Name            string `json:"name"`
+	LongDescription string `json:"long_description"`
+	GroupID         string `json:"group_id"`
+	Mask            string `json:"mask"`
+	Domain          string `json:"domain"`
+	Vector          string `json:"vector"`
+	Source          string `json:"source"` // JSON string
+	Sink            string `json:"sink"`   // JSON string
 }
 
 // Role represents a role that entities can play within a CBU.
@@ -706,11 +706,11 @@ func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID str
 		}
 
 		// Parse JSON metadata
-		if err := json.Unmarshal([]byte(sourceJSON), &attr.Source); err != nil {
-			return nil, fmt.Errorf("failed to parse source metadata: %w", err)
+		if sourceErr := json.Unmarshal([]byte(sourceJSON), &attr.Source); sourceErr != nil {
+			return nil, fmt.Errorf("failed to parse source metadata: %w", sourceErr)
 		}
-		if err := json.Unmarshal([]byte(sinkJSON), &attr.Sink); err != nil {
-			return nil, fmt.Errorf("failed to parse sink metadata: %w", err)
+		if sinkErr := json.Unmarshal([]byte(sinkJSON), &attr.Sink); sinkErr != nil {
+			return nil, fmt.Errorf("failed to parse sink metadata: %w", sinkErr)
 		}
 
 		attributes = append(attributes, attr)
@@ -992,4 +992,169 @@ func (s *Store) DeleteRole(ctx context.Context, roleID string) error {
 	}
 
 	return nil
+}
+
+// ============================================================================
+// EXPORT OPERATIONS (for mock data generation and testing)
+// ============================================================================
+
+// GetAllProducts retrieves all products from the catalog
+func (s *Store) GetAllProducts(ctx context.Context) ([]Product, error) {
+	query := `SELECT product_id, name, description
+	         FROM "dsl-ob-poc".products
+	         ORDER BY name`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all products: %w", err)
+	}
+	defer rows.Close()
+
+	var products []Product
+	for rows.Next() {
+		var p Product
+		if scanErr := rows.Scan(&p.ProductID, &p.Name, &p.Description); scanErr != nil {
+			return nil, fmt.Errorf("failed to scan product: %w", scanErr)
+		}
+		products = append(products, p)
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("error iterating products: %w", rowsErr)
+	}
+
+	return products, nil
+}
+
+// GetAllServices retrieves all services from the catalog
+func (s *Store) GetAllServices(ctx context.Context) ([]Service, error) {
+	query := `SELECT service_id, name, description
+	         FROM "dsl-ob-poc".services
+	         ORDER BY name`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all services: %w", err)
+	}
+	defer rows.Close()
+
+	var services []Service
+	for rows.Next() {
+		var s Service
+		if scanErr := rows.Scan(&s.ServiceID, &s.Name, &s.Description); scanErr != nil {
+			return nil, fmt.Errorf("failed to scan service: %w", scanErr)
+		}
+		services = append(services, s)
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("error iterating services: %w", rowsErr)
+	}
+
+	return services, nil
+}
+
+// GetAllDictionaryAttributes retrieves all dictionary attributes
+func (s *Store) GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	query := `SELECT attribute_id, name, COALESCE(long_description, ''),
+	                 COALESCE(group_id, ''), COALESCE(mask, 'string'),
+	                 COALESCE(domain, ''), COALESCE(vector, ''),
+	                 COALESCE(source::text, '{}'), COALESCE(sink::text, '{}')
+	         FROM "dsl-ob-poc".dictionary
+	         ORDER BY name`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all dictionary attributes: %w", err)
+	}
+	defer rows.Close()
+
+	var attributes []dictionary.Attribute
+	for rows.Next() {
+		var attr dictionary.Attribute
+		var sourceJSON, sinkJSON string
+
+		if scanErr := rows.Scan(&attr.AttributeID, &attr.Name, &attr.LongDescription,
+			&attr.GroupID, &attr.Mask, &attr.Domain, &attr.Vector,
+			&sourceJSON, &sinkJSON); scanErr != nil {
+			return nil, fmt.Errorf("failed to scan dictionary attribute: %w", scanErr)
+		}
+
+		// Parse JSON metadata
+		if sourceErr := json.Unmarshal([]byte(sourceJSON), &attr.Source); sourceErr != nil {
+			return nil, fmt.Errorf("failed to parse source metadata: %w", sourceErr)
+		}
+		if sinkErr := json.Unmarshal([]byte(sinkJSON), &attr.Sink); sinkErr != nil {
+			return nil, fmt.Errorf("failed to parse sink metadata: %w", sinkErr)
+		}
+
+		attributes = append(attributes, attr)
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("error iterating dictionary attributes: %w", rowsErr)
+	}
+
+	return attributes, nil
+}
+
+// GetAllDSLRecords retrieves all DSL records with state information
+func (s *Store) GetAllDSLRecords(ctx context.Context) ([]DSLVersionWithState, error) {
+	query := `SELECT d.version_id::text, d.cbu_id, d.dsl_text,
+	                 COALESCE(o.current_state, 'CREATED'),
+	                 ROW_NUMBER() OVER (PARTITION BY d.cbu_id ORDER BY d.created_at) as version_number,
+	                 d.created_at
+	         FROM "dsl-ob-poc".dsl_ob d
+	         LEFT JOIN "dsl-ob-poc".onboarding_sessions o ON d.cbu_id = o.cbu_id
+	         ORDER BY d.cbu_id, d.created_at`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all DSL records: %w", err)
+	}
+	defer rows.Close()
+
+	var records []DSLVersionWithState
+	for rows.Next() {
+		var record DSLVersionWithState
+		var stateStr string
+
+		if scanErr := rows.Scan(&record.VersionID, &record.CBUID, &record.DSLText,
+			&stateStr, &record.VersionNumber, &record.CreatedAt); scanErr != nil {
+			return nil, fmt.Errorf("failed to scan DSL record: %w", scanErr)
+		}
+
+		// Parse state string to OnboardingState enum
+		record.OnboardingState = parseOnboardingState(stateStr)
+
+		records = append(records, record)
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("error iterating DSL records: %w", rowsErr)
+	}
+
+	return records, nil
+}
+
+// parseOnboardingState converts string state to OnboardingState enum
+func parseOnboardingState(stateStr string) OnboardingState {
+	switch stateStr {
+	case "CREATED":
+		return StateCreated
+	case "PRODUCTS_ADDED":
+		return StateProductsAdded
+	case "KYC_DISCOVERED":
+		return StateKYCDiscovered
+	case "SERVICES_DISCOVERED":
+		return StateServicesDiscovered
+	case "RESOURCES_DISCOVERED":
+		return StateResourcesDiscovered
+	case "ATTRIBUTES_POPULATED":
+		return StateAttributesPopulated
+	case "COMPLETED":
+		return StateCompleted
+	default:
+		return StateCreated
+	}
 }

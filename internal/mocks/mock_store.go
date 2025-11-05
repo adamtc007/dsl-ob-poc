@@ -32,6 +32,10 @@ type MockStore struct {
 	attributeValues  []AttributeValue
 	dslRecords       []DSLRecord
 
+	// In-memory tracking for dynamic DSL versions
+	dynamicDSLVersions []store.DSLVersionWithState
+	versionCounter     int
+
 	loaded bool
 }
 
@@ -555,8 +559,26 @@ func (m *MockStore) UpdateOnboardingState(ctx context.Context, cbuID string, new
 }
 
 func (m *MockStore) InsertDSLWithState(ctx context.Context, cbuID, dslText string, state store.OnboardingState) (string, error) {
-	// For mock store, return a mock version ID with state awareness
-	return fmt.Sprintf("mock-version-state-%d", time.Now().Unix()), nil
+	// Increment version counter
+	m.versionCounter++
+
+	// Create new DSL version
+	versionID := fmt.Sprintf("mock-version-dynamic-%d", m.versionCounter)
+
+	// Create DSL version record
+	dslVersion := store.DSLVersionWithState{
+		VersionID:       versionID,
+		CBUID:           cbuID,
+		DSLText:         dslText,
+		OnboardingState: state,
+		VersionNumber:   m.getNextVersionNumber(cbuID),
+		CreatedAt:       time.Now(),
+	}
+
+	// Store in memory
+	m.dynamicDSLVersions = append(m.dynamicDSLVersions, dslVersion)
+
+	return versionID, nil
 }
 
 func (m *MockStore) GetLatestDSLWithState(ctx context.Context, cbuID string) (*store.DSLVersionWithState, error) {
@@ -611,26 +633,33 @@ func (m *MockStore) GetDSLHistoryWithState(ctx context.Context, cbuID string) ([
 	}
 
 	var history []store.DSLVersionWithState
-	version := 1
 
+	// First add static mock data
+	version := 1
 	for _, record := range m.dslRecords {
 		if record.CBUID == cbuID {
 			// Parse time string
 			createdAt, err := time.Parse(time.RFC3339, record.CreatedAt)
 			if err != nil {
-				createdAt = time.Now() // fallback
+				createdAt = time.Now()
 			}
 
-			dslVersion := store.DSLVersionWithState{
+			history = append(history, store.DSLVersionWithState{
 				VersionID:       record.VersionID,
 				CBUID:           record.CBUID,
 				DSLText:         record.DSLText,
-				OnboardingState: store.StateCreated, // Default state for mock
+				OnboardingState: store.StateCreated,
 				VersionNumber:   version,
 				CreatedAt:       createdAt,
-			}
-			history = append(history, dslVersion)
+			})
 			version++
+		}
+	}
+
+	// Add dynamic DSL versions created during runtime
+	for _, dslVersion := range m.dynamicDSLVersions {
+		if dslVersion.CBUID == cbuID {
+			history = append(history, dslVersion)
 		}
 	}
 
@@ -693,4 +722,122 @@ func (m *MockStore) ListOnboardingSessions(ctx context.Context) ([]store.Onboard
 		},
 	}
 	return sessions, nil
+}
+
+// getNextVersionNumber calculates the next version number for a CBU
+func (m *MockStore) getNextVersionNumber(cbuID string) int {
+	maxVersion := 0
+
+	// Check static mock data
+	for _, record := range m.dslRecords {
+		if record.CBUID == cbuID {
+			maxVersion++
+		}
+	}
+
+	// Check dynamic versions
+	for _, dslVersion := range m.dynamicDSLVersions {
+		if dslVersion.CBUID == cbuID && dslVersion.VersionNumber > maxVersion {
+			maxVersion = dslVersion.VersionNumber
+		}
+	}
+
+	return maxVersion + 1
+}
+
+// ============================================================================
+// EXPORT OPERATIONS (for mock data generation and testing)
+// ============================================================================
+
+// GetAllServices returns all services from mock data
+func (m *MockStore) GetAllServices(ctx context.Context) ([]store.Service, error) {
+	if err := m.loadData(); err != nil {
+		return nil, err
+	}
+	return m.services, nil
+}
+
+// GetAllDictionaryAttributes returns all dictionary attributes from mock data
+func (m *MockStore) GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	if err := m.loadData(); err != nil {
+		return nil, err
+	}
+
+	var attributes []dictionary.Attribute
+	for _, attr := range m.dictionary {
+		// Parse source and sink metadata from JSON strings
+		var sourceMetadata dictionary.SourceMetadata
+		var sinkMetadata dictionary.SinkMetadata
+
+		if attr.Source != "" {
+			_ = json.Unmarshal([]byte(attr.Source), &sourceMetadata)
+		}
+		if attr.Sink != "" {
+			_ = json.Unmarshal([]byte(attr.Sink), &sinkMetadata)
+		}
+
+		attributes = append(attributes, dictionary.Attribute{
+			AttributeID:     attr.AttributeID,
+			Name:            attr.Name,
+			LongDescription: attr.LongDescription,
+			GroupID:         attr.GroupID,
+			Mask:            attr.Mask,
+			Domain:          attr.Domain,
+			Vector:          attr.Vector,
+			Source:          sourceMetadata,
+			Sink:            sinkMetadata,
+		})
+	}
+	return attributes, nil
+}
+
+// GetAllDSLRecords returns all DSL records with state information from mock data
+func (m *MockStore) GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error) {
+	if err := m.loadData(); err != nil {
+		return nil, err
+	}
+
+	var records []store.DSLVersionWithState
+	for i, record := range m.dslRecords {
+		// Parse CreatedAt from string to time.Time
+		createdAt, err := time.Parse(time.RFC3339, record.CreatedAt)
+		if err != nil {
+			// Fallback to current time if parsing fails
+			createdAt = time.Now()
+		}
+
+		// Map mock DSL record to store format
+		dslRecord := store.DSLVersionWithState{
+			VersionID:       record.VersionID,
+			CBUID:           record.CBUID,
+			DSLText:         record.DSLText,
+			OnboardingState: parseOnboardingStateFromString("CREATED"), // Default state for mock data
+			VersionNumber:   i + 1,                                     // Use index as version number
+			CreatedAt:       createdAt,
+		}
+		records = append(records, dslRecord)
+	}
+	return records, nil
+}
+
+// parseOnboardingStateFromString converts string state to OnboardingState enum
+func parseOnboardingStateFromString(stateStr string) store.OnboardingState {
+	switch stateStr {
+	case "CREATED":
+		return store.StateCreated
+	case "PRODUCTS_ADDED":
+		return store.StateProductsAdded
+	case "KYC_DISCOVERED":
+		return store.StateKYCDiscovered
+	case "SERVICES_DISCOVERED":
+		return store.StateServicesDiscovered
+	case "RESOURCES_DISCOVERED":
+		return store.StateResourcesDiscovered
+	case "ATTRIBUTES_POPULATED":
+		return store.StateAttributesPopulated
+	case "COMPLETED":
+		return store.StateCompleted
+	default:
+		return store.StateCreated
+	}
 }

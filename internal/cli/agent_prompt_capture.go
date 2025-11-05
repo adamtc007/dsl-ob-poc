@@ -366,6 +366,7 @@ Provide a comprehensive validation assessment including errors, warnings, and su
 				if mockAgent == nil {
 					mockAgent = agent.NewMockAgent()
 				}
+				validationResponse, validationErr = mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
 			}
 		} else {
 			if mockAgent == nil {

@@ -161,15 +161,21 @@ func run() int {
 	case "history":
 		err = cli.RunHistory(ctx, dataStore, args)
 
-	// DSL Manager COMMANDS (TODO: Implement these functions)
-	// case "dsl-create-case":
-	// 	err = cli.RunDSLCreateCase(ctx, dataStore, args)
-	// case "dsl-update-case":
-	// 	err = cli.RunDSLUpdateCase(ctx, dataStore, args)
-	// case "dsl-get-case":
-	// 	err = cli.RunDSLGetCase(ctx, dataStore, args)
-	// case "dsl-list-cases":
-	// 	err = cli.RunDSLListCases(ctx, dataStore, args)
+	// DSL LIFECYCLE MANAGEMENT COMMANDS
+	case "dsl-lifecycle-create":
+		err = cli.RunDSLLifecycleCreate(ctx, dataStore, args)
+	case "dsl-lifecycle-extend":
+		err = cli.RunDSLLifecycleExtend(ctx, dataStore, args)
+	case "dsl-lifecycle-transition":
+		err = cli.RunDSLLifecycleTransition(ctx, dataStore, args)
+	case "dsl-lifecycle-status":
+		err = cli.RunDSLLifecycleStatus(ctx, dataStore, args)
+	case "dsl-lifecycle-history":
+		err = cli.RunDSLLifecycleHistory(ctx, dataStore, args)
+	case "dsl-lifecycle-execute":
+		err = cli.RunDSLLifecycleExecute(ctx, dataStore, args)
+	case "dsl-lifecycle-archive":
+		err = cli.RunDSLLifecycleArchive(ctx, dataStore, args)
 
 	// CBU CRUD COMMANDS
 	case "cbu-create":
@@ -245,8 +251,15 @@ func printUsage() {
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v5) Discovers and appends resources plan.")
 	fmt.Println("  populate-attributes --cbu=<cbu-id> (v6) Populates attribute values from runtime sources.")
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v7) Resolves and binds attribute values deterministically.")
-	fmt.Println("\nDSL Manager Commands:")
-	fmt.Println("  dsl-create-case --domain=<domain> [--investor-name=<name>] [--investor-type=<type>]")
+
+	fmt.Println("\nDSL Lifecycle Management Commands:")
+	fmt.Println("  dsl-lifecycle-create --domain=<domain> [--client-name=<name>] [--cbu-id=<id>]")
+	fmt.Println("  dsl-lifecycle-extend --onboarding-id=<id> --dsl-fragment=<dsl> --domain-state=<state>")
+	fmt.Println("  dsl-lifecycle-transition --onboarding-id=<id> --lifecycle-state=<state>")
+	fmt.Println("  dsl-lifecycle-status --onboarding-id=<id> [--json]")
+	fmt.Println("  dsl-lifecycle-history --onboarding-id=<id> [--json]")
+	fmt.Println("  dsl-lifecycle-execute --onboarding-id=<id> [--dry-run]")
+	fmt.Println("  dsl-lifecycle-archive --onboarding-id=<id> [--reason=<reason>]")
 	fmt.Println("                 Create a new DSL case with optional domain-specific details")
 	fmt.Println("  dsl-update-case --onboarding-id=<id> --state=<new_state> [--dsl=<dsl_fragment>]")
 	fmt.Println("                 Update an existing DSL case with a new state and optional DSL fragment")

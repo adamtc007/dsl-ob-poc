@@ -64,6 +64,12 @@ type DataStore interface {
 	ResolveValueFor(ctx context.Context, cbuID, attributeID string) (json.RawMessage, map[string]any, string, error)
 	UpsertAttributeValue(ctx context.Context, cbuID string, dslVersion int, attributeID string, value json.RawMessage, state string, source map[string]any) error
 
+	// Export Operations (for mock data generation)
+	GetAllProducts(ctx context.Context) ([]store.Product, error)
+	GetAllServices(ctx context.Context) ([]store.Service, error)
+	GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.Attribute, error)
+	GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error)
+
 	// Catalog Seeding (for database initialization)
 	SeedCatalog(ctx context.Context) error
 	InitDB(ctx context.Context) error
@@ -264,6 +270,23 @@ func (p *postgresAdapter) InitDB(ctx context.Context) error {
 	return p.store.InitDB(ctx)
 }
 
+// Export Operations for postgres adapter
+func (p *postgresAdapter) GetAllProducts(ctx context.Context) ([]store.Product, error) {
+	return p.store.GetAllProducts(ctx)
+}
+
+func (p *postgresAdapter) GetAllServices(ctx context.Context) ([]store.Service, error) {
+	return p.store.GetAllServices(ctx)
+}
+
+func (p *postgresAdapter) GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	return p.store.GetAllDictionaryAttributes(ctx)
+}
+
+func (p *postgresAdapter) GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error) {
+	return p.store.GetAllDSLRecords(ctx)
+}
+
 // mockAdapter adapts the mock store to the DataStore interface
 type mockAdapter struct {
 	store *mocks.MockStore
@@ -404,4 +427,21 @@ func (m *mockAdapter) GetDSLByVersion(ctx context.Context, cbuID string, version
 
 func (m *mockAdapter) ListOnboardingSessions(ctx context.Context) ([]store.OnboardingSession, error) {
 	return m.store.ListOnboardingSessions(ctx)
+}
+
+// Export Operations for mock adapter
+func (m *mockAdapter) GetAllProducts(ctx context.Context) ([]store.Product, error) {
+	return m.store.GetAllProducts(ctx)
+}
+
+func (m *mockAdapter) GetAllServices(ctx context.Context) ([]store.Service, error) {
+	return m.store.GetAllServices(ctx)
+}
+
+func (m *mockAdapter) GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	return m.store.GetAllDictionaryAttributes(ctx)
+}
+
+func (m *mockAdapter) GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error) {
+	return m.store.GetAllDSLRecords(ctx)
 }

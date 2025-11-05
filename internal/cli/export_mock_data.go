@@ -93,31 +93,63 @@ func exportRoles(ctx context.Context, ds datastore.DataStore, outputDir string) 
 }
 
 func exportProducts(ctx context.Context, ds datastore.DataStore, outputDir string) error {
-	// Note: The real ds doesn't have a GetAllProducts method
-	// This would require adding that method or querying directly
-	fmt.Println("Products export not implemented - keeping existing mock data")
-	return nil
+	products, err := ds.GetAllProducts(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(products) == 0 {
+		fmt.Println("No products found - keeping existing mock data")
+		return nil
+	}
+
+	filePath := filepath.Join(outputDir, "products.json")
+	return writeJSONFile(filePath, products, "products")
 }
 
 func exportServices(ctx context.Context, ds datastore.DataStore, outputDir string) error {
-	// Note: We don't have a GetAllServices method, so we'll use a basic query
-	// This is a simplified implementation for the export utility
-	fmt.Println("Services export not implemented - keeping existing mock data")
-	return nil
+	services, err := ds.GetAllServices(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(services) == 0 {
+		fmt.Println("No services found - keeping existing mock data")
+		return nil
+	}
+
+	filePath := filepath.Join(outputDir, "services.json")
+	return writeJSONFile(filePath, services, "services")
 }
 
 func exportDictionary(ctx context.Context, ds datastore.DataStore, outputDir string) error {
-	// Note: We don't have a GetAllDictionaryAttributes method, so we'll skip this
-	// This would require adding a method to the ds interface
-	fmt.Println("Dictionary export not implemented - keeping existing mock data")
-	return nil
+	attributes, err := ds.GetAllDictionaryAttributes(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(attributes) == 0 {
+		fmt.Println("No dictionary attributes found - keeping existing mock data")
+		return nil
+	}
+
+	filePath := filepath.Join(outputDir, "dictionary.json")
+	return writeJSONFile(filePath, attributes, "dictionary attributes")
 }
 
 func exportDSLRecords(ctx context.Context, ds datastore.DataStore, outputDir string) error {
-	// Note: We don't have a GetAllDSLRecords method, so we'll skip this
-	// This would require adding a method to the ds interface
-	fmt.Println("DSL records export not implemented - keeping existing mock data")
-	return nil
+	records, err := ds.GetAllDSLRecords(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(records) == 0 {
+		fmt.Println("No DSL records found - keeping existing mock data")
+		return nil
+	}
+
+	filePath := filepath.Join(outputDir, "dsl_records.json")
+	return writeJSONFile(filePath, records, "DSL records")
 }
 
 func writeJSONFile(filePath string, data interface{}, dataType string) error {
