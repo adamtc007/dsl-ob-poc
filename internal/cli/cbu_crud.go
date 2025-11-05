@@ -103,11 +103,12 @@ func RunCBUDelete(ctx context.Context, ds datastore.DataStore, args []string) er
 
 func parseCBUCreateArgs(args []string) (name, description, naturePurpose string, err error) {
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "--name=") {
+		switch {
+		case strings.HasPrefix(arg, "--name="):
 			name = strings.TrimPrefix(arg, "--name=")
-		} else if strings.HasPrefix(arg, "--description=") {
+		case strings.HasPrefix(arg, "--description="):
 			description = strings.TrimPrefix(arg, "--description=")
-		} else if strings.HasPrefix(arg, "--nature-purpose=") {
+		case strings.HasPrefix(arg, "--nature-purpose="):
 			naturePurpose = strings.TrimPrefix(arg, "--nature-purpose=")
 		}
 	}

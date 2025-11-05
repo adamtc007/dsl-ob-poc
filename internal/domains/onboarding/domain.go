@@ -32,6 +32,10 @@ import (
 	registry "dsl-ob-poc/internal/domain-registry"
 )
 
+const (
+	StateCreate = "CREATE"
+)
+
 // Domain implements the Domain interface for onboarding workflows
 type Domain struct {
 	name        string
@@ -95,7 +99,7 @@ func (d *Domain) GetValidStates() []string {
 }
 
 func (d *Domain) GetInitialState() string {
-	return "CREATE"
+	return StateCreate
 }
 
 // ValidateVerbs checks that the DSL only uses approved onboarding verbs
@@ -274,12 +278,12 @@ func (d *Domain) GenerateDSL(ctx context.Context, req *registry.GenerationReques
 		to := "PRODUCTS_ADDED"
 		if req.Context != nil {
 			if f, ok := req.Context["from_state"]; ok {
-				if fs, ok := f.(string); ok {
+				if fs, fromOk := f.(string); fromOk {
 					from = fs
 				}
 			}
 			if t, ok := req.Context["to_state"]; ok {
-				if ts, ok := t.(string); ok {
+				if ts, toOk := t.(string); toOk {
 					to = ts
 				}
 			}

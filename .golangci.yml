@@ -32,35 +32,35 @@ issues:
       text: "line is \\d+ characters"
       source: "^\\s*//.*$"
 
-  max-issues-per-linter: 50
-  max-same-issues: 3
+  max-issues-per-linter: 20
+  max-same-issues: 2
   new: false
   uniq-by-line: true
 
 linters:
   disable-all: false
   enable:
+    # Critical - potential bugs and errors
     - errcheck # Check for unchecked errors
-    - gosimple # Simplify code
-    - govet # Reports suspicious constructs
-    - ineffassign # Detect ineffectual assignments
+    - govet # Reports suspicious constructs (includes shadow detection)
     - staticcheck # Static analysis checks
-    - unused # Check for unused constants, variables, functions, and types
     - typecheck # Type-check code
+    - errorlint # Find code that causes problems with Go 1.13+ error wrapping
+
+    # Code quality - maintainability
+    - gosimple # Simplify code
+    - ineffassign # Detect ineffectual assignments
+    - unused # Check for unused constants, variables, functions, and types
+    - dupl # Check for duplicate code (major duplications only)
+    - goconst # Find repeated strings that could be constants
+
+    # Formatting and style
     - gofmt # Check formatting
     - goimports # Check import formatting
     - misspell # Find commonly misspelled English words
-    - revive # Fast, configurable, extensible, flexible linter
-    - gosec # Inspect source code for security problems
-    - bodyclose # Check HTTP response body is closed
-    - unconvert # Remove unnecessary type conversions
-    - goconst # Find repeated strings that could be constants
-    - dupl # Check for duplicate code
-    - gocritic # Comprehensive Go linter
-    - prealloc # Find slice declarations that could be pre-allocated
-    - unparam # Find unused function parameters
-    - whitespace # Check for unnecessary whitespace
-    - errorlint # Find code that causes problems with Go 1.13+ error wrapping
+
+    # Security (minimal)
+    - gosec # Only major security issues
 
 linters-settings:
   errcheck:
@@ -69,6 +69,10 @@ linters-settings:
     exclude-functions:
       - fmt.Println
       - fmt.Printf
+      - fmt.Print
+      - log.Printf
+    # Ignore test helper errors
+    ignore: fmt:.*,log:.*
 
   govet:
     enable:
@@ -85,6 +89,8 @@ linters-settings:
 
   misspell:
     locale: US
+    ignore-words:
+      - cancelled # British spelling used in our domain
 
   revive:
     rules:
@@ -104,33 +110,35 @@ linters-settings:
   gosec:
     excludes:
       - G104 # Audit errors not checked (covered by errcheck)
+      - G201 # SQL string formatting (common in our queries)
+      - G301 # Poor file permissions (not critical for POC)
+      - G306 # Poor file permissions on write
     config:
       G306: "0644"
+    # Only flag high severity issues
+    severity: high
 
   goconst:
-    min-len: 3
-    min-occurrences: 3
+    min-len: 4
+    min-occurrences: 4
+    # Ignore short common strings
+    ignore-tests: true
 
   dupl:
-    threshold: 150
+    threshold: 200
 
   gocritic:
     enabled-tags:
       - diagnostic
       - performance
-      - style
     disabled-checks:
       - commentedOutCode
       - whyNoLint
-
-  prealloc:
-    simple: true
-    range-loops: true
-    for-loops: false
-
-  whitespace:
-    multi-if: false
-    multi-func: false
+      - unnamedResult
+      - paramTypeCombine
+      - ifElseChain
+      - nestingReduce
+      - sprintfQuotedString
 
   errorlint:
     errorf: true

@@ -55,5 +55,5 @@ func getConnectionString() string {
 // IsMockMode returns true if running in mock mode
 func IsMockMode() bool {
 	storeType := os.Getenv("DSL_STORE_TYPE")
-	return strings.ToLower(storeType) == "mock"
+	return strings.EqualFold(storeType, "mock")
 }

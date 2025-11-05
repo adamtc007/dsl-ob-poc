@@ -496,8 +496,8 @@ func TestRegistry_ThreadSafety(t *testing.T) {
 
 	// Registry should still be functional
 	domains := registry.List()
-	if len(domains) < 0 {
-		t.Error("Registry appears to be corrupted after concurrent access")
+	if len(domains) == 0 {
+		t.Error("Registry appears to be corrupted after concurrent access - no domains found")
 	}
 }
 

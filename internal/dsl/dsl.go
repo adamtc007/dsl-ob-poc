@@ -238,15 +238,15 @@ func ParseKYCRequirements(dsl string) (*KYCRequirements, error) {
 			// This is a naive implementation for a POC
 			remDocMatches := regexp.MustCompile(`\(remove-documents\s+(.*?)\)`).FindStringSubmatch(dsl)
 			if len(remDocMatches) > 1 {
-				docMatches := docRegex.FindAllStringSubmatch(remDocMatches[1], -1)
-				for _, m := range docMatches {
+				innerDocMatches := docRegex.FindAllStringSubmatch(remDocMatches[1], -1)
+				for _, m := range innerDocMatches {
 					delete(docSet, m[1])
 				}
 			}
 			remJurisMatches := regexp.MustCompile(`\(remove-jurisdictions\s+(.*?)\)`).FindStringSubmatch(dsl)
 			if len(remJurisMatches) > 1 {
-				jurisMatches := jurisRegex.FindAllStringSubmatch(remJurisMatches[1], -1)
-				for _, m := range jurisMatches {
+				innerJurisMatches := jurisRegex.FindAllStringSubmatch(remJurisMatches[1], -1)
+				for _, m := range innerJurisMatches {
 					delete(jurisSet, m[1])
 				}
 			}

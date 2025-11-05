@@ -62,9 +62,9 @@ func RunGetAttributeValues(ctx context.Context, ds datastore.DataStore, args []s
 	// 4) Resolve & persist
 	assignments := map[string]string{}
 	for _, attrID := range ids {
-		val, prov, state, err := ds.ResolveValueFor(ctx, *cbuID, attrID)
-		if err != nil {
-			return fmt.Errorf("failed to resolve value for %s: %w", attrID, err)
+		val, prov, state, resolveErr := ds.ResolveValueFor(ctx, *cbuID, attrID)
+		if resolveErr != nil {
+			return fmt.Errorf("failed to resolve value for %s: %w", attrID, resolveErr)
 		}
 
 		if upsertErr := ds.UpsertAttributeValue(ctx, *cbuID, version, attrID, val, state, prov); upsertErr != nil {

@@ -70,18 +70,18 @@ type DataStore interface {
 }
 
 // DataStoreType represents the type of data store to use
-type DataStoreType string
+type Type string
 
 const (
 	// PostgreSQLStore uses real PostgreSQL database
-	PostgreSQLStore DataStoreType = "postgresql"
+	PostgreSQLStore Type = "postgresql"
 	// MockStore uses JSON mock data
-	MockStore DataStoreType = "mock"
+	MockStore Type = "mock"
 )
 
 // Config holds configuration for data store creation
 type Config struct {
-	Type             DataStoreType
+	Type             Type
 	ConnectionString string
 	MockDataPath     string
 }

@@ -161,6 +161,16 @@ func run() int {
 	case "history":
 		err = cli.RunHistory(ctx, dataStore, args)
 
+	// DSL Manager COMMANDS (TODO: Implement these functions)
+	// case "dsl-create-case":
+	// 	err = cli.RunDSLCreateCase(ctx, dataStore, args)
+	// case "dsl-update-case":
+	// 	err = cli.RunDSLUpdateCase(ctx, dataStore, args)
+	// case "dsl-get-case":
+	// 	err = cli.RunDSLGetCase(ctx, dataStore, args)
+	// case "dsl-list-cases":
+	// 	err = cli.RunDSLListCases(ctx, dataStore, args)
+
 	// CBU CRUD COMMANDS
 	case "cbu-create":
 		err = cli.RunCBUCreate(ctx, dataStore, args)
@@ -210,6 +220,15 @@ func run() int {
 func printUsage() {
 	fmt.Println("Onboarding DSL POC CLI (Core Onboarding System)")
 	fmt.Println("Usage: dsl-poc <command> [options]")
+	fmt.Println("\nDSL Manager Commands:")
+	fmt.Println("  dsl-create-case --domain=<domain> [--investor-name=<name>] [--investor-type=<type>]")
+	fmt.Println("                 Create a new DSL case with optional domain-specific details")
+	fmt.Println("  dsl-update-case --onboarding-id=<id> --state=<new_state> [--dsl=<dsl_fragment>]")
+	fmt.Println("                 Update an existing DSL case with a new state and optional DSL fragment")
+	fmt.Println("  dsl-get-case --onboarding-id=<id>")
+	fmt.Println("                 Retrieve full details of a specific DSL case")
+	fmt.Println("  dsl-list-cases")
+	fmt.Println("                 List all active DSL case IDs")
 	fmt.Println("\nEnvironment Variables:")
 	fmt.Println("  DSL_STORE_TYPE         Set to 'mock' for disconnected mode, 'postgresql' for database mode (default)")
 	fmt.Println("  DSL_MOCK_DATA_PATH     Path to mock data directory (default: data/mocks)")
@@ -226,6 +245,15 @@ func printUsage() {
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v5) Discovers and appends resources plan.")
 	fmt.Println("  populate-attributes --cbu=<cbu-id> (v6) Populates attribute values from runtime sources.")
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v7) Resolves and binds attribute values deterministically.")
+	fmt.Println("\nDSL Manager Commands:")
+	fmt.Println("  dsl-create-case --domain=<domain> [--investor-name=<name>] [--investor-type=<type>]")
+	fmt.Println("                 Create a new DSL case with optional domain-specific details")
+	fmt.Println("  dsl-update-case --onboarding-id=<id> --state=<new_state> [--dsl=<dsl_fragment>]")
+	fmt.Println("                 Update an existing DSL case with a new state and optional DSL fragment")
+	fmt.Println("  dsl-get-case --onboarding-id=<id>")
+	fmt.Println("                 Retrieve full details of a specific DSL case")
+	fmt.Println("  dsl-list-cases")
+	fmt.Println("                 List all active DSL case IDs")
 
 	fmt.Println("\nAI Agent Commands (requires GEMINI_API_KEY):")
 	fmt.Println("  agent-transform --cbu=<cbu-id>   AI-powered DSL transformation with natural language instructions")

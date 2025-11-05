@@ -129,15 +129,15 @@ func RunAgentTransform(ctx context.Context, ds datastore.DataStore, ai *agent.Ag
 			saveState = currentDSLState.OnboardingState
 		}
 
-		versionID, err := ds.InsertDSLWithState(ctx, *cbuID, finalDSL, saveState)
-		if err != nil {
-			return fmt.Errorf("failed to save transformed DSL: %w", err)
+		versionID, insertErr := ds.InsertDSLWithState(ctx, *cbuID, finalDSL, saveState)
+		if insertErr != nil {
+			return fmt.Errorf("failed to save transformed DSL: %w", insertErr)
 		}
 
 		// Update onboarding session state
-		err = ds.UpdateOnboardingState(ctx, *cbuID, saveState, versionID)
-		if err != nil {
-			return fmt.Errorf("failed to update onboarding state: %w", err)
+		updateErr := ds.UpdateOnboardingState(ctx, *cbuID, saveState, versionID)
+		if updateErr != nil {
+			return fmt.Errorf("failed to update onboarding state: %w", updateErr)
 		}
 
 		fmt.Printf("✅ **Transformed DSL saved successfully**\n")

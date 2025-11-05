@@ -134,8 +134,8 @@ Please transform the DSL according to the instruction while moving toward the ta
 	}
 
 	// Validate that only approved DSL verbs are used
-	if err := validateDSLVerbs(transformResp.NewDSL); err != nil {
-		return nil, fmt.Errorf("DSL validation failed: %w", err)
+	if validateErr := validateDSLVerbs(transformResp.NewDSL); validateErr != nil {
+		return nil, fmt.Errorf("DSL validation failed: %w", validateErr)
 	}
 
 	return &transformResp, nil
@@ -353,32 +353,30 @@ func validateDSLVerbs(dsl string) error {
 	seen := make(map[string]bool) // Track seen verbs to avoid duplicates
 
 	for _, match := range matches {
-		if len(match) > 1 {
-			verb := match[1]
+		if len(match) <= 1 {
+			continue
+		}
+		verb := match[1]
 
-			// Skip if already processed
-			if seen[verb] {
-				continue
-			}
-			seen[verb] = true
+		// Skip if already processed
+		if seen[verb] {
+			continue
+		}
+		seen[verb] = true
 
-			// Skip non-verb constructs (parameters, attributes, etc.)
-			// These appear inside s-expressions but aren't verbs themselves
-			if strings.HasSuffix(verb, ".id") ||
-				verb == "for.product" ||
-				verb == "resource.create" ||
-				verb == "attr.id" ||
-				strings.Contains(verb, "condition.") ||
-				strings.Contains(verb, "document.") ||
-				strings.Contains(verb, "task.") ||
-				strings.Contains(verb, "result.") ||
-				strings.Contains(verb, "system.") {
-				continue
-			}
+		// Skip non-verb constructs (parameters, attributes, etc.)
+		// These appear inside s-expressions but aren't verbs themselves
+		if strings.HasSuffix(verb, ".id") ||
+			verb == "for.product" ||
+			verb == "resource.create" ||
+			verb == "attr.id" ||
+			verb == "bind" {
+			continue
+		}
 
-			if !approvedVerbs[verb] {
-				unapprovedVerbs = append(unapprovedVerbs, verb)
-			}
+		// Check if verb is approved
+		if !approvedVerbs[verb] {
+			unapprovedVerbs = append(unapprovedVerbs, verb)
 		}
 	}
 

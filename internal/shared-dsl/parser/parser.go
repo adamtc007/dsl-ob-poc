@@ -169,9 +169,9 @@ func (p *Parser) parseExpression() (*Node, error) {
 			return nil, p.error("unexpected EOF, expected ')' to close expression")
 		}
 
-		arg, err := p.parseArgument()
-		if err != nil {
-			return nil, err
+		arg, parseErr := p.parseArgument()
+		if parseErr != nil {
+			return nil, parseErr
 		}
 		node.Children = append(node.Children, arg)
 	}

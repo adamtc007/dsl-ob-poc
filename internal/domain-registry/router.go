@@ -344,7 +344,7 @@ func (r *Router) routeByVerbRegex(ctx context.Context, request *RoutingRequest) 
 
 // routeByContext uses session context to determine appropriate domain
 func (r *Router) routeByContext(ctx context.Context, request *RoutingRequest) (*RoutingResponse, error) {
-	if request.Context == nil || len(request.Context) == 0 {
+	if len(request.Context) == 0 {
 		return nil, nil
 	}
 

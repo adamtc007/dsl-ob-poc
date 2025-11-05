@@ -14,6 +14,12 @@ import (
 	"dsl-ob-poc/internal/dsl"
 )
 
+const (
+	testTypeAll = "all"
+	testTypeKYC = "kyc"
+	testTypeDSL = "dsl"
+)
+
 // RunAgentPromptCapture demonstrates AI agent capabilities with full prompt/response capture
 func RunAgentPromptCapture(ctx context.Context, ds datastore.DataStore, ai *agent.Agent, args []string) error {
 	fs := flag.NewFlagSet("agent-prompt-capture", flag.ExitOnError)
@@ -40,8 +46,8 @@ func RunAgentPromptCapture(ctx context.Context, ds datastore.DataStore, ai *agen
 		text := fmt.Sprintf(format, args...)
 		fmt.Print(text)
 		if outputFile != nil {
-			if _, err := outputFile.WriteString(text); err != nil {
-				log.Printf("Warning: Failed to write to output file: %v", err)
+			if _, writeErr := outputFile.WriteString(text); writeErr != nil {
+				log.Printf("Warning: Failed to write to output file: %v", writeErr)
 			}
 		}
 	}
@@ -82,7 +88,7 @@ func RunAgentPromptCapture(ctx context.Context, ds datastore.DataStore, ai *agen
 	writeToBoth("   DSL Length: %d characters\n\n", len(currentDSLState.DSLText))
 
 	// Test KYC Agent with prompt capture
-	if *testType == "all" || *testType == "kyc" {
+	if *testType == testTypeAll || *testType == testTypeKYC {
 		writeToBoth("🔍 **KYC Agent Prompt/Response Capture**\n")
 		writeToBoth("=======================================\n")
 
@@ -148,22 +154,22 @@ EXAMPLES:
 
 			// Call real AI agent if available, otherwise mock
 			var kycReqs *dsl.KYCRequirements
-			var err error
+			var kycErr error
 
 			if ai != nil {
 				writeToBoth("\n🚀 **Calling Real Gemini API...**\n")
-				kycReqs, err = ai.CallKYCAgent(ctx, scenario.nature, scenario.products)
-				if err != nil {
-					writeToBoth("❌ Real AI Error: %v\n", err)
+				kycReqs, kycErr = ai.CallKYCAgent(ctx, scenario.nature, scenario.products)
+				if kycErr != nil {
+					writeToBoth("❌ Real AI Error: %v\n", kycErr)
 					writeToBoth("🔄 Falling back to mock response...\n")
-					kycReqs, err = mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
+					kycReqs, kycErr = mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
 				}
 			} else {
-				kycReqs, err = mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
+				kycReqs, kycErr = mockAgent.CallKYCAgent(ctx, scenario.nature, scenario.products)
 			}
 
-			if err != nil {
-				writeToBoth("❌ Error: %v\n\n", err)
+			if kycErr != nil {
+				writeToBoth("❌ Error: %v\n\n", kycErr)
 				continue
 			}
 
@@ -188,7 +194,7 @@ EXAMPLES:
 	}
 
 	// Test DSL Transformation Agent with prompt capture
-	if *testType == "all" || *testType == "transform" {
+	if *testType == testTypeAll || *testType == testTypeDSL {
 		writeToBoth("\n🔄 **DSL Transformation Agent Prompt/Response Capture**\n")
 		writeToBoth("====================================================\n")
 
@@ -260,28 +266,28 @@ Please transform the DSL according to the instruction while moving toward the ta
 
 		// Call real AI agent if available, otherwise mock
 		var response *agent.DSLTransformationResponse
-		var err error
+		var transformErr error
 
 		if ai != nil {
 			writeToBoth("\n🚀 **Calling Real Gemini API for DSL Transformation...**\n")
-			response, err = ai.CallDSLTransformationAgent(ctx, request)
-			if err != nil {
-				writeToBoth("❌ Real AI Error: %v\n", err)
+			response, transformErr = ai.CallDSLTransformationAgent(ctx, request)
+			if transformErr != nil {
+				writeToBoth("❌ Real AI Error: %v\n", transformErr)
 				writeToBoth("🔄 Falling back to mock response...\n")
 				if mockAgent == nil {
 					mockAgent = agent.NewMockAgent()
 				}
-				response, err = mockAgent.CallDSLTransformationAgent(ctx, request)
+				response, transformErr = mockAgent.CallDSLTransformationAgent(ctx, request)
 			}
 		} else {
 			if mockAgent == nil {
 				mockAgent = agent.NewMockAgent()
 			}
-			response, err = mockAgent.CallDSLTransformationAgent(ctx, request)
+			response, transformErr = mockAgent.CallDSLTransformationAgent(ctx, request)
 		}
 
-		if err != nil {
-			writeToBoth("❌ Error: %v\n", err)
+		if transformErr != nil {
+			writeToBoth("❌ Error: %v\n", transformErr)
 		} else {
 			// Show actual response
 			responseJSON, _ := json.Marshal(response)
@@ -306,7 +312,7 @@ Please transform the DSL according to the instruction while moving toward the ta
 	}
 
 	// Test DSL Validation Agent with prompt capture
-	if *testType == "all" || *testType == "validate" {
+	if *testType == testTypeAll || *testType == testTypeKYC {
 		writeToBoth("\n✅ **DSL Validation Agent Prompt/Response Capture**\n")
 		writeToBoth("=================================================\n")
 
@@ -349,28 +355,27 @@ Provide a comprehensive validation assessment including errors, warnings, and su
 
 		// Call real AI agent if available, otherwise mock
 		var validationResponse *agent.DSLValidationResponse
-		var err error
+		var validationErr error
 
 		if ai != nil {
 			writeToBoth("\n🚀 **Calling Real Gemini API for DSL Validation...**\n")
-			validationResponse, err = ai.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
-			if err != nil {
-				writeToBoth("❌ Real AI Error: %v\n", err)
+			validationResponse, validationErr = ai.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
+			if validationErr != nil {
+				writeToBoth("❌ Real AI Error: %v\n", validationErr)
 				writeToBoth("🔄 Falling back to mock response...\n")
 				if mockAgent == nil {
 					mockAgent = agent.NewMockAgent()
 				}
-				validationResponse, err = mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
 			}
 		} else {
 			if mockAgent == nil {
 				mockAgent = agent.NewMockAgent()
 			}
-			validationResponse, err = mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
+			validationResponse, validationErr = mockAgent.CallDSLValidationAgent(ctx, currentDSLState.DSLText)
 		}
 
-		if err != nil {
-			writeToBoth("❌ Error: %v\n", err)
+		if validationErr != nil {
+			writeToBoth("❌ Error: %v\n", validationErr)
 		} else {
 			// Show actual validation response
 			validationJSON, _ := json.Marshal(validationResponse)
