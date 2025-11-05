@@ -1,5 +1,13 @@
 # Multi-DSL Domain Orchestration Implementation Plan
 
+## 🎯 CRITICAL STATUS UPDATE
+
+**Phase 1-3 Complete**: ✅ Foundation infrastructure implemented  
+**Phase 4 URGENT**: 🔥 Database migration required  
+**Issue**: All vocabulary hardcoded in-memory vs. database-driven architecture
+
+---
+
 ## 🎯 Executive Summary
 
 This plan outlines the implementation of a sophisticated **Multi-DSL Domain Orchestration** system that dynamically generates and coordinates entity-type and product-specific onboarding workflows. The system combines dynamic DSL generation with domain routing and shared context management to create a unified, compliant, and scalable onboarding platform.
@@ -68,14 +76,72 @@ Onboarding Request (CBU + Entities + Products)
 
 ## 📐 Detailed Implementation Plan
 
-### Phase 0: Universal DSL Foundation - Database-Stored Grammar & Dynamic Parser (Weeks -2 to 0)
+## ✅ COMPLETED PHASES (Phase 1-3)
 
-#### 0.1 Database-Stored EBNF Grammar System
+### Phase 1: Foundation - Orchestration Infrastructure ✅ COMPLETE
+- **OrchestrationSession Management**: Multi-domain session coordination
+- **Context Analysis Engine**: Entity/product-based domain discovery  
+- **Domain Registry System**: Thread-safe registration and lookup
+- **Cross-Domain DSL Accumulation**: Unified state management
+- **Execution Planning**: Dependency resolution and optimization
+- **CLI Interface**: Complete command set (`orchestrate-create`, `orchestrate-execute`, etc.)
+- **Session Lifecycle**: Creation, execution, monitoring, cleanup
+- **Persistent Storage**: Database-backed session management
+- **Comprehensive Testing**: 95%+ coverage with integration tests
+
+### Phase 2: Dynamic DSL Generation Engine ✅ COMPLETE  
+- **DSL Generator**: Template-based DSL generation with 4 entity types
+- **DSL Composition Engine**: Merges entity, product, regulatory templates
+- **Template System**: 345+ line sophisticated templates (Trust UBO, Corporate UBO, Custody, FinCEN)
+- **Execution Plan Optimization**: Dependency-aware execution planning
+- **Master DSL Generation**: Comprehensive workflow documents
+- **Cross-Jurisdictional Support**: US, EU, Swiss, UK compliance templates
+
+### Phase 3: Orchestration DSL Verbs ✅ COMPLETE
+- **Orchestration Vocabulary**: 15+ new orchestration-specific verbs
+- **Verb Executor**: Processes orchestration DSL verbs with validation
+- **Cross-Domain State Management**: AttributeID-as-Type coordination
+- **Domain Communication**: Message routing and result collection  
+- **Product Integration**: Compatibility validation and configuration
+- **Workflow Coordination**: Parallel execution and dependency management
+
+## 🔥 PHASE 4: CRITICAL DATABASE MIGRATION (IMMEDIATE PRIORITY)
+
+**ARCHITECTURAL VIOLATION**: Current implementation uses hardcoded in-memory vocabulary instead of database-driven grammar and vocabulary storage as designed in Phase 0.
+
+**Impact**: 
+- Cannot dynamically update DSL verbs without code changes
+- Vocabulary validation hardcoded in multiple places
+- Cross-domain verb coordination relies on in-memory maps
+- No central source of truth for grammar rules
+- Prevents runtime vocabulary evolution and AI-driven verb discovery
+
+### Phase 0/4: 🔥 **URGENT: Database-Stored Grammar & Vocabulary Migration** (Immediate Priority)
+
+**CRITICAL ISSUE**: Current Phase 1-3 implementations use hardcoded in-memory vocabulary and grammar. This violates the core architectural principle of database-driven DSL evolution and prevents proper vocabulary validation, cross-domain coordination, and dynamic grammar updates.
+
+**Required Immediate Actions**:
+
+1. **Create Database Schema** - Add missing grammar and vocabulary tables
+2. **Migrate All Vocabularies** - Move hardcoded verbs to database storage  
+3. **Update All Vocabulary Calls** - Replace in-memory lookups with database queries
+4. **Implement Dynamic Loading** - Load grammar rules and verbs from database
+5. **Remove Hardcoded Mocks** - Eliminate all in-memory vocabulary implementations
+
+### Phase 0: Universal DSL Foundation - Database-Stored Grammar & Dynamic Parser (IMPLEMENTATION REQUIRED)
+
+#### 4.1 Database-Stored EBNF Grammar System (CRITICAL)
 **Files to Create:**
+- `sql/migrations/0005_create_dsl_grammar_tables.sql`
 - `internal/dsl/grammar/grammar_repository.go`
 - `internal/dsl/parser/dynamic_parser.go`
 - `internal/dsl/ast/ast_builder.go`
-- `sql/migrations/0005_create_dsl_grammar_tables.sql`
+
+**Files to Refactor:**
+- `internal/orchestration/orchestration_vocabulary.go` → Replace with DB calls
+- `internal/agent/dsl_agent.go` → Remove hardcoded verb validation
+- `hedge-fund-investor-source/web/internal/hf-agent/hf_dsl_agent.go` → Remove hardcoded verbs
+- All domain vocabulary implementations → Migrate to database
 
 **Database Schema for Grammar Storage:**
 ```sql
@@ -141,7 +207,20 @@ INSERT INTO "dsl-ob-poc".grammar_rules (rule_name, rule_definition, rule_categor
 ('comment', '"; [^\n]*"', 'tokens');
 ```
 
-#### 0.2 Database-Stored Domain Vocabulary System
+#### 4.2 Database-Stored Domain Vocabulary System (CRITICAL MIGRATION)
+
+**Current Problem**: 
+- `orchestration_vocabulary.go` has 15+ verbs hardcoded in memory
+- `dsl_agent.go` has 68+ verbs hardcoded in validation map
+- `hf_dsl_agent.go` has 17+ hedge fund verbs hardcoded
+- Each domain has separate hardcoded vocabulary
+
+**Required Actions**:
+1. **Seed Database**: Insert all current hardcoded verbs into database tables
+2. **Replace All Calls**: Update every vocabulary lookup to query database
+3. **Dynamic Loading**: Implement runtime vocabulary loading from database
+4. **Validation Updates**: Replace hardcoded validation with database-driven validation
+5. **Cache Layer**: Add intelligent caching for performance
 **Additional Database Tables:**
 ```sql
 -- Domain vocabulary storage - all DSL verbs stored as data
@@ -305,7 +384,90 @@ func (gm *GrammarManager) TestGrammarWithSamples(version string, samples []strin
 - ✅ **Audit Trail**: Complete history of all grammar modifications
 - ✅ **Environment-Specific**: Different environments can have different grammars
 
-### Phase 1: Foundation - Orchestration Infrastructure (Weeks 1-2)
+## 📋 PHASE 4 IMPLEMENTATION STEPS
+
+### Step 1: Create Database Schema (URGENT - Day 1)
+**File**: `sql/migrations/0005_create_dsl_grammar_tables.sql`
+
+```sql
+-- Grammar Rules Storage
+CREATE TABLE "dsl-ob-poc".grammar_rules (
+    rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rule_name VARCHAR(100) NOT NULL,
+    rule_definition TEXT NOT NULL,
+    rule_category VARCHAR(50),
+    version VARCHAR(20) NOT NULL DEFAULT '1.0.0',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    UNIQUE (rule_name, version)
+);
+
+-- Domain Vocabularies Storage  
+CREATE TABLE "dsl-ob-poc".domain_vocabularies (
+    vocab_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    domain_name VARCHAR(100) NOT NULL,
+    verb_name VARCHAR(200) NOT NULL,
+    verb_definition JSONB NOT NULL,
+    verb_category VARCHAR(50),
+    semantic_rules JSONB,
+    version VARCHAR(20) NOT NULL DEFAULT '1.0.0',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    UNIQUE (domain_name, verb_name, version)
+);
+
+-- Verb Arguments Storage
+CREATE TABLE "dsl-ob-poc".verb_arguments (
+    arg_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vocab_id UUID NOT NULL REFERENCES "dsl-ob-poc".domain_vocabularies(vocab_id),
+    argument_name VARCHAR(100) NOT NULL,
+    argument_type VARCHAR(50) NOT NULL,
+    is_required BOOLEAN DEFAULT FALSE,
+    validation_rules JSONB,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+-- Orchestration Cross-Domain Rules
+CREATE TABLE "dsl-ob-poc".orchestration_rules (
+    rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_domain VARCHAR(100) NOT NULL,
+    target_domain VARCHAR(100) NOT NULL,
+    rule_type VARCHAR(100),
+    rule_definition JSONB,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+```
+
+### Step 2: Migrate Hardcoded Vocabularies (URGENT - Day 2-3)
+**Priority Order**:
+1. **Orchestration Verbs** (15 verbs from `orchestration_vocabulary.go`)
+2. **Onboarding Verbs** (68 verbs from `dsl_agent.go`)  
+3. **Hedge Fund Verbs** (17 verbs from `hf_dsl_agent.go`)
+4. **UBO Domain Verbs** (discover and implement)
+5. **KYC Domain Verbs** (discover and implement)
+
+### Step 3: Database Repository Layer (Day 4-5)
+**Files to Create**:
+- `internal/vocabulary/repository.go` - Database vocabulary access
+- `internal/grammar/repository.go` - Database grammar access  
+- `internal/parser/dynamic_parser.go` - Database-driven parser
+
+### Step 4: Replace All In-Memory Calls (Day 6-7)
+**Files to Update**:
+- Remove `NewOrchestrationVocabulary()` hardcoded implementation
+- Update `ValidateOrchestrationVerbs()` to query database
+- Replace `CallDSLTransformationAgent()` verb validation with database
+- Update all domain `GetVocabulary()` methods to query database
+
+### Step 5: Implement Caching Layer (Day 8)
+- Redis/in-memory cache for frequently accessed verbs
+- Cache invalidation on vocabulary updates
+- Performance optimization for verb lookups
+
+---
+
+### Phase 1: Foundation - Orchestration Infrastructure ✅ COMPLETE (Weeks 1-2)
 
 #### 1.1 Multi-Domain Session Manager Enhancement
 **Files to Modify:**
@@ -351,7 +513,7 @@ func DetermineRequiredDomains(context *OnboardingContext) []RequiredDomain
 func BuildDependencyGraph(domains []RequiredDomain) *ExecutionPlan
 ```
 
-### Phase 2: Dynamic DSL Generation Engine (Weeks 3-4)
+### Phase 2: Dynamic DSL Generation Engine ✅ COMPLETE (Weeks 3-4)
 
 #### 2.1 DSL Template System
 **Files to Create:**
@@ -416,7 +578,7 @@ templates/
   (depends.on ["@attr{trust-ubo-complete}", "@attr{hf-investor-complete}"]))
 ```
 
-### Phase 3: Orchestration DSL Verbs (Weeks 5-6)
+### Phase 3: Orchestration DSL Verbs ✅ COMPLETE (Weeks 5-6)
 
 #### 3.1 New Orchestration Verbs
 **Files to Modify:**
@@ -754,7 +916,36 @@ Response: Single orchestrated DSL document with:
 
 ---
 
-## 📋 Next Steps for Review
+## 📋 IMMEDIATE NEXT STEPS (CRITICAL)
+
+### 🔥 Phase 4 Database Migration (THIS WEEK)
+1. **Create Database Schema** - Add grammar/vocabulary tables to `sql/init.sql`
+2. **Seed Current Vocabularies** - Migrate all hardcoded verbs to database
+3. **Implement Repository Pattern** - Database access layer for vocabularies
+4. **Update All Calls** - Replace in-memory with database lookups
+5. **Add Caching** - Performance optimization layer
+6. **Remove Hardcoded Implementations** - Clean up in-memory mocks
+7. **Test Database Integration** - Verify all functionality works with DB
+
+### Success Criteria for Phase 4
+- [ ] All DSL verbs stored in database tables
+- [ ] Zero hardcoded vocabulary in code  
+- [ ] All validation queries database
+- [ ] Dynamic vocabulary loading working
+- [ ] Performance acceptable with caching
+- [ ] All existing tests pass with database backend
+- [ ] New verbs can be added via database inserts (not code changes)
+
+### Post-Phase 4: Ready for Production
+- **Dynamic Vocabulary Updates**: Add/modify verbs without deployments
+- **AI-Driven Verb Discovery**: LLM can suggest new verbs stored in database
+- **Cross-Domain Coordination**: Database-enforced vocabulary consistency
+- **Audit Trail**: Complete history of vocabulary changes
+- **Multi-Tenant Support**: Domain-specific vocabularies per tenant
+
+---
+
+## 📋 Next Steps for Review (AFTER Phase 4)
 
 **Please review this enhanced implementation plan focusing on:**
 

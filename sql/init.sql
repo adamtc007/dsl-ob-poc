@@ -58,6 +58,133 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_services (
 );
 
 -- ============================================================================
+-- PRODUCT REQUIREMENTS TABLES (PHASE 5 IMPLEMENTATION)
+-- ============================================================================
+
+-- Product Requirements table: DSL operations and attributes required per product
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_requirements (
+    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+    entity_types JSONB NOT NULL,           -- Array of supported entity types ["TRUST", "CORPORATION", etc.]
+    required_dsl JSONB NOT NULL,           -- Array of required DSL verbs for this product
+    attributes JSONB NOT NULL,             -- Array of required attribute IDs
+    compliance JSONB NOT NULL,             -- Array of compliance rules (ProductComplianceRule objects)
+    prerequisites JSONB NOT NULL,          -- Array of prerequisite operations that must complete first
+    conditional_rules JSONB NOT NULL,      -- Array of conditional rules (ProductConditionalRule objects)
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    PRIMARY KEY (product_id)
+);
+
+-- Entity Product Mappings table: Compatibility matrix for entity types and products
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_product_mappings (
+    entity_type VARCHAR(100) NOT NULL,     -- TRUST, CORPORATION, PARTNERSHIP, INDIVIDUAL
+    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
+    compatible BOOLEAN NOT NULL,           -- Whether this entity type can use this product
+    restrictions JSONB,                    -- Array of restriction descriptions
+    required_fields JSONB,                 -- Array of additional fields required for this combination
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    PRIMARY KEY (entity_type, product_id)
+);
+
+-- Product Workflows table: Generated workflows for specific product-entity combinations
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_workflows (
+    workflow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cbu_id VARCHAR(255) NOT NULL,
+    product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id),
+    entity_type VARCHAR(100) NOT NULL,
+    required_dsl JSONB NOT NULL,           -- Array of DSL verbs for this workflow
+    generated_dsl TEXT NOT NULL,           -- Complete generated DSL document
+    compliance_rules JSONB NOT NULL,       -- Array of applicable compliance rules
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING', -- PENDING, GENERATING, READY, EXECUTING, COMPLETED, FAILED
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+-- Indexes for product requirements tables
+CREATE INDEX IF NOT EXISTS idx_product_requirements_product ON "dsl-ob-poc".product_requirements (product_id);
+CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_entity ON "dsl-ob-poc".entity_product_mappings (entity_type);
+CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_product ON "dsl-ob-poc".entity_product_mappings (product_id);
+CREATE INDEX IF NOT EXISTS idx_entity_product_mappings_compatible ON "dsl-ob-poc".entity_product_mappings (compatible);
+CREATE INDEX IF NOT EXISTS idx_product_workflows_cbu ON "dsl-ob-poc".product_workflows (cbu_id);
+CREATE INDEX IF NOT EXISTS idx_product_workflows_status ON "dsl-ob-poc".product_workflows (status);
+CREATE INDEX IF NOT EXISTS idx_product_workflows_product_entity ON "dsl-ob-poc".product_workflows (product_id, entity_type);
+
+-- ============================================================================
+-- GRAMMAR AND VOCABULARY TABLES (PHASE 4 MIGRATION)
+-- ============================================================================
+
+-- DSL Grammar Rules - Database-stored EBNF grammar definitions
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".grammar_rules (
+    rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rule_name VARCHAR(100) NOT NULL UNIQUE, -- e.g., "s_expression", "verb_call", "attribute_ref"
+    rule_definition TEXT NOT NULL,          -- EBNF rule definition
+    rule_type VARCHAR(50) NOT NULL DEFAULT 'production', -- 'production', 'terminal', 'lexical'
+    domain VARCHAR(100),                    -- Domain this rule applies to, NULL for universal
+    version VARCHAR(20) DEFAULT '1.0.0',   -- Grammar version
+    active BOOLEAN DEFAULT true,           -- Enable/disable rules
+    description TEXT,                      -- Human-readable description
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_grammar_rules_name ON "dsl-ob-poc".grammar_rules (rule_name);
+CREATE INDEX IF NOT EXISTS idx_grammar_rules_domain ON "dsl-ob-poc".grammar_rules (domain);
+CREATE INDEX IF NOT EXISTS idx_grammar_rules_active ON "dsl-ob-poc".grammar_rules (active);
+
+-- Domain Vocabularies - Database-stored DSL verbs by domain
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".domain_vocabularies (
+    vocab_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    domain VARCHAR(100) NOT NULL,          -- e.g., "onboarding", "kyc", "hedge-fund-investor"
+    verb VARCHAR(100) NOT NULL,            -- e.g., "case.create", "kyc.start", "investor.create-opportunity"
+    category VARCHAR(50),                  -- e.g., "case_management", "compliance", "workflow"
+    description TEXT,                      -- Human-readable description
+    parameters JSONB,                      -- Parameter definitions as JSON
+    examples JSONB,                        -- Usage examples as JSON array
+    phase VARCHAR(20),                     -- Implementation phase (for migration tracking)
+    active BOOLEAN DEFAULT true,          -- Enable/disable verbs
+    version VARCHAR(20) DEFAULT '1.0.0',  -- Vocabulary version
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_vocabularies_domain_verb ON "dsl-ob-poc".domain_vocabularies (domain, verb);
+CREATE INDEX IF NOT EXISTS idx_domain_vocabularies_category ON "dsl-ob-poc".domain_vocabularies (category);
+CREATE INDEX IF NOT EXISTS idx_domain_vocabularies_active ON "dsl-ob-poc".domain_vocabularies (active);
+
+-- Cross-Domain Verb Registry - Global verb registry for conflict detection
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".verb_registry (
+    verb VARCHAR(100) PRIMARY KEY,        -- The actual verb (e.g., "case.create")
+    primary_domain VARCHAR(100) NOT NULL, -- Domain that "owns" this verb
+    shared BOOLEAN DEFAULT false,         -- Can be used by multiple domains
+    deprecated BOOLEAN DEFAULT false,     -- Mark for deprecation
+    replacement_verb VARCHAR(100),        -- If deprecated, what replaces it
+    description TEXT,                     -- Global description
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_verb_registry_domain ON "dsl-ob-poc".verb_registry (primary_domain);
+CREATE INDEX IF NOT EXISTS idx_verb_registry_shared ON "dsl-ob-poc".verb_registry (shared);
+CREATE INDEX IF NOT EXISTS idx_verb_registry_deprecated ON "dsl-ob-poc".verb_registry (deprecated);
+
+-- Vocabulary Change Audit - Track all vocabulary changes for compliance
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".vocabulary_audit (
+    audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    domain VARCHAR(100) NOT NULL,
+    verb VARCHAR(100) NOT NULL,
+    change_type VARCHAR(20) NOT NULL,     -- 'CREATE', 'UPDATE', 'DELETE', 'DEPRECATE'
+    old_definition JSONB,                 -- Previous state (for UPDATE/DELETE)
+    new_definition JSONB,                 -- New state (for CREATE/UPDATE)
+    changed_by VARCHAR(255),              -- User/system that made the change
+    change_reason TEXT,                   -- Why the change was made
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_domain_verb ON "dsl-ob-poc".vocabulary_audit (domain, verb);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_change_type ON "dsl-ob-poc".vocabulary_audit (change_type);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_audit_created_at ON "dsl-ob-poc".vocabulary_audit (created_at DESC);
+
+-- ============================================================================
 -- DICTIONARY AND RESOURCE TABLES (REFACTORED)
 -- ============================================================================
 
@@ -371,3 +498,124 @@ CREATE INDEX IF NOT EXISTS idx_ubo_registry_cbu ON "dsl-ob-poc".ubo_registry (cb
 CREATE INDEX IF NOT EXISTS idx_ubo_registry_subject ON "dsl-ob-poc".ubo_registry (subject_entity_id);
 CREATE INDEX IF NOT EXISTS idx_ubo_registry_ubo_person ON "dsl-ob-poc".ubo_registry (ubo_person_id);
 CREATE INDEX IF NOT EXISTS idx_ubo_registry_workflow ON "dsl-ob-poc".ubo_registry (workflow_type);
+
+-- ============================================================================
+-- MULTI-DSL ORCHESTRATION SESSIONS (Phase 1 Persistent Storage)
+-- ============================================================================
+
+-- Orchestration Sessions table: Persistent multi-domain workflow sessions
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".orchestration_sessions (
+    session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    primary_domain VARCHAR(100) NOT NULL,
+
+    -- Entity and workflow context
+    cbu_id UUID REFERENCES "dsl-ob-poc".cbus (cbu_id),
+    entity_type VARCHAR(50),
+    entity_name TEXT,
+    jurisdiction VARCHAR(10),
+    products TEXT[], -- Array of product names
+    services TEXT[], -- Array of service names
+    workflow_type VARCHAR(50) DEFAULT 'ONBOARDING',
+
+    -- Session state
+    current_state VARCHAR(50) DEFAULT 'CREATED',
+    version_number INTEGER DEFAULT 0,
+
+    -- DSL accumulation (DSL-as-State pattern)
+    unified_dsl TEXT, -- The complete accumulated DSL document
+
+    -- Cross-domain context and execution plan (stored as JSON)
+    shared_context JSONB, -- SharedContext struct as JSON
+    execution_plan JSONB, -- ExecutionPlan struct as JSON
+    entity_refs JSONB, -- Cross-domain entity references
+    attribute_refs JSONB, -- Cross-domain attribute references
+
+    -- Session lifecycle
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    last_used TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    expires_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc' + INTERVAL '24 hours')
+);
+
+CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_cbu ON "dsl-ob-poc".orchestration_sessions (cbu_id);
+CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_entity_type ON "dsl-ob-poc".orchestration_sessions (entity_type);
+CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_workflow ON "dsl-ob-poc".orchestration_sessions (workflow_type);
+CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_state ON "dsl-ob-poc".orchestration_sessions (current_state);
+CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_last_used ON "dsl-ob-poc".orchestration_sessions (last_used);
+CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_expires ON "dsl-ob-poc".orchestration_sessions (expires_at);
+
+-- Domain Sessions table: Individual domain sessions within orchestration
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".orchestration_domain_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    orchestration_session_id UUID NOT NULL REFERENCES "dsl-ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE,
+    domain_name VARCHAR(100) NOT NULL,
+    domain_session_id UUID NOT NULL, -- Domain's internal session ID
+
+    -- Domain state
+    state VARCHAR(50) DEFAULT 'CREATED',
+    contributed_dsl TEXT, -- DSL contributed by this domain
+    domain_context JSONB, -- Domain-specific context
+    dependencies TEXT[], -- Array of domain names this depends on
+
+    -- Activity tracking
+    last_activity TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+
+    UNIQUE (orchestration_session_id, domain_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_orchestration_domain_sessions_orchestration ON "dsl-ob-poc".orchestration_domain_sessions (orchestration_session_id);
+CREATE INDEX IF NOT EXISTS idx_orchestration_domain_sessions_domain ON "dsl-ob-poc".orchestration_domain_sessions (domain_name);
+CREATE INDEX IF NOT EXISTS idx_orchestration_domain_sessions_state ON "dsl-ob-poc".orchestration_domain_sessions (state);
+CREATE INDEX IF NOT EXISTS idx_orchestration_domain_sessions_activity ON "dsl-ob-poc".orchestration_domain_sessions (last_activity);
+
+-- Orchestration Tasks table: Track workflow tasks and dependencies
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".orchestration_tasks (
+    task_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    orchestration_session_id UUID NOT NULL REFERENCES "dsl-ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE,
+    domain_name VARCHAR(100) NOT NULL,
+
+    -- Task definition
+    verb VARCHAR(200) NOT NULL, -- DSL verb to execute
+    parameters JSONB, -- Verb parameters as JSON
+    dependencies TEXT[], -- Array of task IDs this depends on
+
+    -- Task state
+    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, SCHEDULED, RUNNING, COMPLETED, FAILED, SKIPPED
+    generated_dsl TEXT, -- DSL generated by this task
+    error_message TEXT, -- Error if task failed
+
+    -- Timing
+    scheduled_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_orchestration_tasks_session ON "dsl-ob-poc".orchestration_tasks (orchestration_session_id);
+CREATE INDEX IF NOT EXISTS idx_orchestration_tasks_domain ON "dsl-ob-poc".orchestration_tasks (domain_name);
+CREATE INDEX IF NOT EXISTS idx_orchestration_tasks_status ON "dsl-ob-poc".orchestration_tasks (status);
+CREATE INDEX IF NOT EXISTS idx_orchestration_tasks_scheduled ON "dsl-ob-poc".orchestration_tasks (scheduled_at);
+
+-- State History table: Track orchestration session state transitions
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".orchestration_state_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    orchestration_session_id UUID NOT NULL REFERENCES "dsl-ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE,
+
+    -- State transition
+    from_state VARCHAR(50),
+    to_state VARCHAR(50) NOT NULL,
+    domain_name VARCHAR(100), -- Domain that triggered the transition
+    reason TEXT,
+    generated_by VARCHAR(100), -- 'USER', 'AI_AGENT', 'SYSTEM'
+
+    -- Additional context
+    version_number INTEGER, -- Session version at time of transition
+    metadata JSONB, -- Additional transition metadata
+
+    created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_orchestration_state_history_session ON "dsl-ob-poc".orchestration_state_history (orchestration_session_id);
+CREATE INDEX IF NOT EXISTS idx_orchestration_state_history_states ON "dsl-ob-poc".orchestration_state_history (from_state, to_state);
+CREATE INDEX IF NOT EXISTS idx_orchestration_state_history_created ON "dsl-ob-poc".orchestration_state_history (created_at);

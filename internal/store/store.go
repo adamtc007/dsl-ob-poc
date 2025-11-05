@@ -12,6 +12,7 @@ import (
 
 	"dsl-ob-poc/internal/dictionary"
 
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -40,6 +41,42 @@ type Service struct {
 	ServiceID   string `json:"service_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+// Phase 5 Product Requirements Types
+type ProductRequirements struct {
+	ProductID        string                   `json:"product_id"`
+	ProductName      string                   `json:"product_name"`
+	EntityTypes      []string                 `json:"entity_types"`
+	RequiredDSL      []string                 `json:"required_dsl"`
+	Attributes       []string                 `json:"attributes"`
+	Compliance       []ProductComplianceRule  `json:"compliance"`
+	Prerequisites    []string                 `json:"prerequisites"`
+	ConditionalRules []ProductConditionalRule `json:"conditional_rules"`
+	CreatedAt        time.Time                `json:"created_at"`
+	UpdatedAt        time.Time                `json:"updated_at"`
+}
+
+type ProductComplianceRule struct {
+	RuleID      string `json:"rule_id"`
+	Framework   string `json:"framework"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+}
+
+type ProductConditionalRule struct {
+	Condition   string   `json:"condition"`
+	RequiredDSL []string `json:"required_dsl"`
+	Attributes  []string `json:"attributes"`
+}
+
+type EntityProductMapping struct {
+	EntityType     string    `json:"entity_type"`
+	ProductID      string    `json:"product_id"`
+	Compatible     bool      `json:"compatible"`
+	Restrictions   []string  `json:"restrictions"`
+	RequiredFields []string  `json:"required_fields"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // ProdResource represents a resource required by products/services.
@@ -680,6 +717,460 @@ func (s *Store) GetResourcesForService(ctx context.Context, serviceID string) ([
 	return resources, nil
 }
 
+// Orchestration session persistence methods
+
+// SaveOrchestrationSession persists an orchestration session to the database
+func (s *Store) SaveOrchestrationSession(ctx context.Context, sessionData *OrchestrationSessionData) error {
+	// Serialize JSON fields
+	sharedContextJSON, err := json.Marshal(sessionData.SharedContext)
+	if err != nil {
+		return fmt.Errorf("failed to marshal shared context: %w", err)
+	}
+
+	executionPlanJSON, err := json.Marshal(sessionData.ExecutionPlan)
+	if err != nil {
+		return fmt.Errorf("failed to marshal execution plan: %w", err)
+	}
+
+	entityRefsJSON, err := json.Marshal(sessionData.EntityRefs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal entity refs: %w", err)
+	}
+
+	attributeRefsJSON, err := json.Marshal(sessionData.AttributeRefs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal attribute refs: %w", err)
+	}
+
+	expiresAt := time.Now().Add(24 * time.Hour) // Default 24 hour expiration
+
+	// Upsert orchestration session
+	query := `
+		INSERT INTO "dsl-ob-poc".orchestration_sessions (
+			session_id, primary_domain, cbu_id, entity_type, entity_name,
+			jurisdiction, products, services, workflow_type, current_state,
+			version_number, unified_dsl, shared_context, execution_plan,
+			entity_refs, attribute_refs, created_at, updated_at, last_used, expires_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+		)
+		ON CONFLICT (session_id) DO UPDATE SET
+			primary_domain = EXCLUDED.primary_domain,
+			current_state = EXCLUDED.current_state,
+			version_number = EXCLUDED.version_number,
+			unified_dsl = EXCLUDED.unified_dsl,
+			shared_context = EXCLUDED.shared_context,
+			execution_plan = EXCLUDED.execution_plan,
+			entity_refs = EXCLUDED.entity_refs,
+			attribute_refs = EXCLUDED.attribute_refs,
+			updated_at = EXCLUDED.updated_at,
+			last_used = EXCLUDED.last_used,
+			expires_at = EXCLUDED.expires_at
+	`
+
+	_, err = s.db.ExecContext(ctx, query,
+		sessionData.SessionID,
+		sessionData.PrimaryDomain,
+		sessionData.CBUID,
+		sessionData.EntityType,
+		sessionData.EntityName,
+		sessionData.Jurisdiction,
+		pq.Array(sessionData.Products),
+		pq.Array(sessionData.Services),
+		sessionData.WorkflowType,
+		sessionData.CurrentState,
+		sessionData.VersionNumber,
+		sessionData.UnifiedDSL,
+		sharedContextJSON,
+		executionPlanJSON,
+		entityRefsJSON,
+		attributeRefsJSON,
+		sessionData.CreatedAt,
+		sessionData.UpdatedAt,
+		sessionData.LastUsed,
+		expiresAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to save orchestration session: %w", err)
+	}
+
+	// Save domain sessions
+	if err := s.saveDomainSessions(ctx, sessionData); err != nil {
+		return fmt.Errorf("failed to save domain sessions: %w", err)
+	}
+
+	return nil
+}
+
+// LoadOrchestrationSession retrieves an orchestration session from the database
+func (s *Store) LoadOrchestrationSession(ctx context.Context, sessionID string) (*OrchestrationSessionData, error) {
+	query := `
+		SELECT session_id, primary_domain, cbu_id, entity_type, entity_name,
+			   jurisdiction, products, services, workflow_type, current_state,
+			   version_number, unified_dsl, shared_context, execution_plan,
+			   entity_refs, attribute_refs, created_at, updated_at, last_used
+		FROM "dsl-ob-poc".orchestration_sessions
+		WHERE session_id = $1 AND expires_at > NOW()
+	`
+
+	row := s.db.QueryRowContext(ctx, query, sessionID)
+
+	var session OrchestrationSessionData
+	var products, services pq.StringArray
+	var sharedContextJSON, executionPlanJSON, entityRefsJSON, attributeRefsJSON []byte
+
+	err := row.Scan(
+		&session.SessionID,
+		&session.PrimaryDomain,
+		&session.CBUID,
+		&session.EntityType,
+		&session.EntityName,
+		&session.Jurisdiction,
+		&products,
+		&services,
+		&session.WorkflowType,
+		&session.CurrentState,
+		&session.VersionNumber,
+		&session.UnifiedDSL,
+		&sharedContextJSON,
+		&executionPlanJSON,
+		&entityRefsJSON,
+		&attributeRefsJSON,
+		&session.CreatedAt,
+		&session.UpdatedAt,
+		&session.LastUsed,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("orchestration session not found: %s", sessionID)
+		}
+		return nil, fmt.Errorf("failed to load orchestration session: %w", err)
+	}
+
+	session.Products = []string(products)
+	session.Services = []string(services)
+
+	// Deserialize JSON fields
+	if err := json.Unmarshal(sharedContextJSON, &session.SharedContext); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal shared context: %w", err)
+	}
+
+	if err := json.Unmarshal(executionPlanJSON, &session.ExecutionPlan); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal execution plan: %w", err)
+	}
+
+	if err := json.Unmarshal(entityRefsJSON, &session.EntityRefs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal entity refs: %w", err)
+	}
+
+	if err := json.Unmarshal(attributeRefsJSON, &session.AttributeRefs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal attribute refs: %w", err)
+	}
+
+	// Load domain sessions
+	domainSessions, err := s.loadDomainSessions(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load domain sessions: %w", err)
+	}
+	session.DomainSessions = domainSessions
+
+	// Load state history
+	stateHistory, err := s.loadStateHistory(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load state history: %w", err)
+	}
+	session.StateHistory = stateHistory
+
+	// Update last used timestamp
+	s.updateLastUsed(ctx, sessionID)
+
+	return &session, nil
+}
+
+// ListActiveOrchestrationSessions returns IDs of all active sessions
+func (s *Store) ListActiveOrchestrationSessions(ctx context.Context) ([]string, error) {
+	query := `
+		SELECT session_id
+		FROM "dsl-ob-poc".orchestration_sessions
+		WHERE expires_at > NOW()
+		ORDER BY last_used DESC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list active sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessionIDs []string
+	for rows.Next() {
+		var sessionID string
+		if err := rows.Scan(&sessionID); err != nil {
+			return nil, fmt.Errorf("failed to scan session ID: %w", err)
+		}
+		sessionIDs = append(sessionIDs, sessionID)
+	}
+
+	return sessionIDs, nil
+}
+
+// DeleteOrchestrationSession removes a session and all its related data
+func (s *Store) DeleteOrchestrationSession(ctx context.Context, sessionID string) error {
+	query := `DELETE FROM "dsl-ob-poc".orchestration_sessions WHERE session_id = $1`
+
+	result, err := s.db.ExecContext(ctx, query, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to delete session: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	return nil
+}
+
+// CleanupExpiredOrchestrationSessions removes expired sessions
+func (s *Store) CleanupExpiredOrchestrationSessions(ctx context.Context) (int64, error) {
+	query := `DELETE FROM "dsl-ob-poc".orchestration_sessions WHERE expires_at <= NOW()`
+
+	result, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return 0, fmt.Errorf("failed to cleanup expired sessions: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return rowsAffected, nil
+}
+
+// UpdateOrchestrationSessionDSL updates the unified DSL and version for a session
+func (s *Store) UpdateOrchestrationSessionDSL(ctx context.Context, sessionID, dsl string, version int) error {
+	query := `
+		UPDATE "dsl-ob-poc".orchestration_sessions
+		SET unified_dsl = $2, version_number = $3, updated_at = NOW(), last_used = NOW()
+		WHERE session_id = $1
+	`
+
+	result, err := s.db.ExecContext(ctx, query, sessionID, dsl, version)
+	if err != nil {
+		return fmt.Errorf("failed to update session DSL: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	return nil
+}
+
+// Helper methods for orchestration session persistence
+
+func (s *Store) saveDomainSessions(ctx context.Context, sessionData *OrchestrationSessionData) error {
+	// Delete existing domain sessions for this orchestration session
+	deleteQuery := `DELETE FROM "dsl-ob-poc".orchestration_domain_sessions WHERE orchestration_session_id = $1`
+	_, err := s.db.ExecContext(ctx, deleteQuery, sessionData.SessionID)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing domain sessions: %w", err)
+	}
+
+	// Insert current domain sessions
+	insertQuery := `
+		INSERT INTO "dsl-ob-poc".orchestration_domain_sessions (
+			orchestration_session_id, domain_name, domain_session_id, state,
+			contributed_dsl, domain_context, dependencies, last_activity, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+
+	for _, domainSession := range sessionData.DomainSessions {
+		contextJSON, err := json.Marshal(domainSession.Context)
+		if err != nil {
+			return fmt.Errorf("failed to marshal domain context for %s: %w", domainSession.DomainName, err)
+		}
+
+		_, err = s.db.ExecContext(ctx, insertQuery,
+			sessionData.SessionID,
+			domainSession.DomainName,
+			domainSession.DomainSessionID,
+			domainSession.State,
+			domainSession.ContributedDSL,
+			contextJSON,
+			pq.Array(domainSession.Dependencies),
+			domainSession.LastActivity,
+			time.Now(),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to save domain session for %s: %w", domainSession.DomainName, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Store) loadDomainSessions(ctx context.Context, sessionID string) ([]DomainSessionData, error) {
+	query := `
+		SELECT domain_name, domain_session_id, state, contributed_dsl,
+			   domain_context, dependencies, last_activity
+		FROM "dsl-ob-poc".orchestration_domain_sessions
+		WHERE orchestration_session_id = $1
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query domain sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var domainSessions []DomainSessionData
+
+	for rows.Next() {
+		var domainSession DomainSessionData
+		var contextJSON []byte
+		var dependencies pq.StringArray
+
+		err := rows.Scan(
+			&domainSession.DomainName,
+			&domainSession.DomainSessionID,
+			&domainSession.State,
+			&domainSession.ContributedDSL,
+			&contextJSON,
+			&dependencies,
+			&domainSession.LastActivity,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan domain session: %w", err)
+		}
+
+		// Unmarshal context
+		if err := json.Unmarshal(contextJSON, &domainSession.Context); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal domain context: %w", err)
+		}
+
+		domainSession.Dependencies = []string(dependencies)
+		domainSessions = append(domainSessions, domainSession)
+	}
+
+	return domainSessions, nil
+}
+
+func (s *Store) loadStateHistory(ctx context.Context, sessionID string) ([]StateTransitionData, error) {
+	query := `
+		SELECT from_state, to_state, domain_name, reason, generated_by, created_at
+		FROM "dsl-ob-poc".orchestration_state_history
+		WHERE orchestration_session_id = $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query state history: %w", err)
+	}
+	defer rows.Close()
+
+	var stateHistory []StateTransitionData
+
+	for rows.Next() {
+		var transition StateTransitionData
+		var fromState, domain, reason, generatedBy sql.NullString
+
+		err := rows.Scan(
+			&fromState,
+			&transition.ToState,
+			&domain,
+			&reason,
+			&generatedBy,
+			&transition.Timestamp,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan state transition: %w", err)
+		}
+
+		if fromState.Valid {
+			transition.FromState = fromState.String
+		}
+		if domain.Valid {
+			transition.Domain = domain.String
+		}
+		if reason.Valid {
+			transition.Reason = reason.String
+		}
+		if generatedBy.Valid {
+			transition.GeneratedBy = generatedBy.String
+		}
+
+		stateHistory = append(stateHistory, transition)
+	}
+
+	return stateHistory, nil
+}
+
+func (s *Store) updateLastUsed(ctx context.Context, sessionID string) {
+	// Update in background, don't block on this
+	go func() {
+		query := `UPDATE "dsl-ob-poc".orchestration_sessions SET last_used = NOW() WHERE session_id = $1`
+		s.db.ExecContext(context.Background(), query, sessionID)
+	}()
+}
+
+// OrchestrationSessionData represents the data structure for persistent orchestration sessions
+type OrchestrationSessionData struct {
+	SessionID      string                 `json:"session_id"`
+	PrimaryDomain  string                 `json:"primary_domain"`
+	CBUID          *string                `json:"cbu_id,omitempty"`
+	EntityType     *string                `json:"entity_type,omitempty"`
+	EntityName     *string                `json:"entity_name,omitempty"`
+	Jurisdiction   *string                `json:"jurisdiction,omitempty"`
+	Products       []string               `json:"products,omitempty"`
+	Services       []string               `json:"services,omitempty"`
+	WorkflowType   *string                `json:"workflow_type,omitempty"`
+	CurrentState   string                 `json:"current_state"`
+	VersionNumber  int                    `json:"version_number"`
+	UnifiedDSL     string                 `json:"unified_dsl"`
+	SharedContext  map[string]interface{} `json:"shared_context"`
+	ExecutionPlan  map[string]interface{} `json:"execution_plan"`
+	EntityRefs     map[string]string      `json:"entity_refs"`
+	AttributeRefs  map[string]string      `json:"attribute_refs"`
+	DomainSessions []DomainSessionData    `json:"domain_sessions"`
+	StateHistory   []StateTransitionData  `json:"state_history"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
+	LastUsed       time.Time              `json:"last_used"`
+}
+
+// DomainSessionData represents a domain session within orchestration
+type DomainSessionData struct {
+	DomainName      string                 `json:"domain_name"`
+	DomainSessionID string                 `json:"domain_session_id"`
+	State           string                 `json:"state"`
+	ContributedDSL  string                 `json:"contributed_dsl"`
+	Context         map[string]interface{} `json:"context"`
+	Dependencies    []string               `json:"dependencies"`
+	LastActivity    time.Time              `json:"last_activity"`
+}
+
+// StateTransitionData represents a state transition record
+type StateTransitionData struct {
+	FromState   string    `json:"from_state"`
+	ToState     string    `json:"to_state"`
+	Domain      string    `json:"domain,omitempty"`
+	Reason      string    `json:"reason,omitempty"`
+	GeneratedBy string    `json:"generated_by,omitempty"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
 // GetAttributesForDictionaryGroup retrieves all attributes for a given dictionary group.
 func (s *Store) GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]dictionary.Attribute, error) {
 	rows, err := s.db.QueryContext(ctx,
@@ -1157,4 +1648,444 @@ func parseOnboardingState(stateStr string) OnboardingState {
 	default:
 		return StateCreated
 	}
+}
+
+// ============================================================================
+// PRODUCT REQUIREMENTS OPERATIONS (PHASE 5)
+// ============================================================================
+
+// SeedProductRequirements populates the database with initial product requirements data
+func (s *Store) SeedProductRequirements(ctx context.Context) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// Get existing product IDs
+	productMap := make(map[string]string)
+	rows, err := tx.QueryContext(ctx, `SELECT product_id, name FROM "dsl-ob-poc".products`)
+	if err != nil {
+		return fmt.Errorf("failed to query products: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return fmt.Errorf("failed to scan product: %w", err)
+		}
+		productMap[name] = id
+	}
+
+	// Seed product requirements
+	productReqs := []struct {
+		name             string
+		entityTypes      []string
+		requiredDSL      []string
+		attributes       []string
+		compliance       []map[string]interface{}
+		prerequisites    []string
+		conditionalRules []map[string]interface{}
+	}{
+		{
+			name:        "CUSTODY",
+			entityTypes: []string{"TRUST", "CORPORATION", "PARTNERSHIP", "INDIVIDUAL"},
+			requiredDSL: []string{"custody.account-setup", "custody.signatory-verification", "custody.asset-safekeeping"},
+			attributes:  []string{"custody.account_number", "custody.signatory_authority", "custody.asset_types"},
+			compliance: []map[string]interface{}{
+				{
+					"rule_id":     "CUSTODY_FINCEN_CONTROL",
+					"framework":   "FINCEN",
+					"description": "FinCEN control prong verification required for custody services",
+					"required":    true,
+				},
+			},
+			prerequisites: []string{"kyc.complete", "aml.screening-complete"},
+			conditionalRules: []map[string]interface{}{
+				{
+					"condition":    "entity_type == 'TRUST'",
+					"required_dsl": []string{"custody.trust-specific-verification"},
+					"attributes":   []string{"trust.deed_verification", "trust.beneficiary_disclosure"},
+				},
+			},
+		},
+		{
+			name:        "FUND_ACCOUNTING",
+			entityTypes: []string{"CORPORATION", "TRUST", "PARTNERSHIP"},
+			requiredDSL: []string{"accounting.nav-calculation", "accounting.reporting-setup", "accounting.compliance-monitoring"},
+			attributes:  []string{"accounting.nav_value", "accounting.reporting_frequency", "accounting.base_currency"},
+			compliance: []map[string]interface{}{
+				{
+					"rule_id":     "ACCOUNTING_GAAP_COMPLIANCE",
+					"framework":   "GAAP",
+					"description": "Generally Accepted Accounting Principles compliance required",
+					"required":    true,
+				},
+			},
+			prerequisites: []string{"custody.account-setup", "entity.legal_structure_verified"},
+		},
+		{
+			name:        "TRANSFER_AGENCY",
+			entityTypes: []string{"CORPORATION", "TRUST"},
+			requiredDSL: []string{"transfer.registry-setup", "transfer.shareholder-services", "transfer.dividend-processing"},
+			attributes:  []string{"transfer.share_classes", "transfer.dividend_policy", "transfer.registry_type"},
+			compliance: []map[string]interface{}{
+				{
+					"rule_id":     "TRANSFER_SEC_COMPLIANCE",
+					"framework":   "SEC",
+					"description": "Securities and Exchange Commission transfer agency regulations",
+					"required":    true,
+				},
+			},
+			prerequisites: []string{"entity.incorporation_verified", "custody.account-setup"},
+			conditionalRules: []map[string]interface{}{
+				{
+					"condition":    "entity_type == 'TRUST'",
+					"required_dsl": []string{"transfer.trust-unit-tracking"},
+					"attributes":   []string{"trust.unit_classes", "trust.distribution_rights"},
+				},
+			},
+		},
+	}
+
+	for _, req := range productReqs {
+		productID, exists := productMap[req.name]
+		if !exists {
+			continue // Skip if product doesn't exist
+		}
+
+		// Marshal JSON fields
+		entityTypesJSON, _ := json.Marshal(req.entityTypes)
+		requiredDSLJSON, _ := json.Marshal(req.requiredDSL)
+		attributesJSON, _ := json.Marshal(req.attributes)
+		complianceJSON, _ := json.Marshal(req.compliance)
+		prerequisitesJSON, _ := json.Marshal(req.prerequisites)
+		conditionalRulesJSON, _ := json.Marshal(req.conditionalRules)
+
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO "dsl-ob-poc".product_requirements
+			(product_id, entity_types, required_dsl, attributes, compliance, prerequisites, conditional_rules)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (product_id) DO UPDATE SET
+				entity_types = EXCLUDED.entity_types,
+				required_dsl = EXCLUDED.required_dsl,
+				attributes = EXCLUDED.attributes,
+				compliance = EXCLUDED.compliance,
+				prerequisites = EXCLUDED.prerequisites,
+				conditional_rules = EXCLUDED.conditional_rules,
+				updated_at = NOW()`,
+			productID, entityTypesJSON, requiredDSLJSON, attributesJSON,
+			complianceJSON, prerequisitesJSON, conditionalRulesJSON)
+		if err != nil {
+			return fmt.Errorf("failed to insert product requirements for %s: %w", req.name, err)
+		}
+	}
+
+	// Seed entity-product mappings
+	entityMappings := []struct {
+		entityType     string
+		productName    string
+		compatible     bool
+		restrictions   []string
+		requiredFields []string
+	}{
+		{"TRUST", "CUSTODY", true, []string{}, []string{"trust_deed", "beneficiary_list"}},
+		{"TRUST", "FUND_ACCOUNTING", true, []string{}, []string{"accounting_method", "distribution_policy"}},
+		{"TRUST", "TRANSFER_AGENCY", true, []string{}, []string{"unit_classes", "registry_type"}},
+		{"CORPORATION", "CUSTODY", true, []string{}, []string{"board_resolution", "authorized_signatories"}},
+		{"CORPORATION", "FUND_ACCOUNTING", true, []string{}, []string{"corporate_structure", "reporting_standards"}},
+		{"CORPORATION", "TRANSFER_AGENCY", true, []string{}, []string{"share_classes", "transfer_restrictions"}},
+		{"PARTNERSHIP", "CUSTODY", true, []string{}, []string{"partnership_agreement", "general_partner_authority"}},
+		{"PARTNERSHIP", "FUND_ACCOUNTING", true, []string{}, []string{"capital_account_method", "allocation_method"}},
+		{"PARTNERSHIP", "TRANSFER_AGENCY", false, []string{"Partnerships typically use different investor tracking mechanisms"}, []string{}},
+		{"INDIVIDUAL", "CUSTODY", true, []string{}, []string{"identity_verification", "investment_capacity"}},
+		{"INDIVIDUAL", "FUND_ACCOUNTING", false, []string{"Fund accounting typically not required for individual accounts"}, []string{}},
+		{"INDIVIDUAL", "TRANSFER_AGENCY", false, []string{"Transfer agency services not applicable to individual accounts"}, []string{}},
+	}
+
+	for _, mapping := range entityMappings {
+		productID, exists := productMap[mapping.productName]
+		if !exists {
+			continue // Skip if product doesn't exist
+		}
+
+		restrictionsJSON, _ := json.Marshal(mapping.restrictions)
+		requiredFieldsJSON, _ := json.Marshal(mapping.requiredFields)
+
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO "dsl-ob-poc".entity_product_mappings
+			(entity_type, product_id, compatible, restrictions, required_fields)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (entity_type, product_id) DO UPDATE SET
+				compatible = EXCLUDED.compatible,
+				restrictions = EXCLUDED.restrictions,
+				required_fields = EXCLUDED.required_fields`,
+			mapping.entityType, productID, mapping.compatible, restrictionsJSON, requiredFieldsJSON)
+		if err != nil {
+			return fmt.Errorf("failed to insert entity-product mapping %s-%s: %w", mapping.entityType, mapping.productName, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetProductRequirements retrieves requirements for a specific product
+func (s *Store) GetProductRequirements(ctx context.Context, productID string) (*ProductRequirements, error) {
+	query := `
+		SELECT pr.product_id, p.name as product_name, pr.entity_types, pr.required_dsl,
+		       pr.attributes, pr.compliance, pr.prerequisites, pr.conditional_rules,
+		       pr.created_at, pr.updated_at
+		FROM "dsl-ob-poc".product_requirements pr
+		JOIN "dsl-ob-poc".products p ON pr.product_id = p.product_id
+		WHERE pr.product_id = $1`
+
+	row := s.db.QueryRowContext(ctx, query, productID)
+
+	var req ProductRequirements
+	var entityTypesJSON, requiredDSLJSON, attributesJSON, complianceJSON, prerequisitesJSON, conditionalRulesJSON []byte
+
+	err := row.Scan(
+		&req.ProductID, &req.ProductName, &entityTypesJSON, &requiredDSLJSON,
+		&attributesJSON, &complianceJSON, &prerequisitesJSON, &conditionalRulesJSON,
+		&req.CreatedAt, &req.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("product requirements not found for product %s", productID)
+		}
+		return nil, fmt.Errorf("failed to get product requirements: %w", err)
+	}
+
+	// Unmarshal JSON fields
+	if err := json.Unmarshal(entityTypesJSON, &req.EntityTypes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal entity_types: %w", err)
+	}
+	if err := json.Unmarshal(requiredDSLJSON, &req.RequiredDSL); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal required_dsl: %w", err)
+	}
+	if err := json.Unmarshal(attributesJSON, &req.Attributes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal attributes: %w", err)
+	}
+	if err := json.Unmarshal(complianceJSON, &req.Compliance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal compliance: %w", err)
+	}
+	if err := json.Unmarshal(prerequisitesJSON, &req.Prerequisites); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal prerequisites: %w", err)
+	}
+	if err := json.Unmarshal(conditionalRulesJSON, &req.ConditionalRules); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal conditional_rules: %w", err)
+	}
+
+	return &req, nil
+}
+
+// GetEntityProductMapping retrieves compatibility mapping for entity type and product
+func (s *Store) GetEntityProductMapping(ctx context.Context, entityType, productID string) (*EntityProductMapping, error) {
+	query := `
+		SELECT entity_type, product_id, compatible, restrictions, required_fields, created_at
+		FROM "dsl-ob-poc".entity_product_mappings
+		WHERE entity_type = $1 AND product_id = $2`
+
+	row := s.db.QueryRowContext(ctx, query, entityType, productID)
+
+	var mapping EntityProductMapping
+	var restrictionsJSON, requiredFieldsJSON []byte
+
+	err := row.Scan(
+		&mapping.EntityType, &mapping.ProductID, &mapping.Compatible,
+		&restrictionsJSON, &requiredFieldsJSON, &mapping.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("entity-product mapping not found for %s-%s", entityType, productID)
+		}
+		return nil, fmt.Errorf("failed to get entity-product mapping: %w", err)
+	}
+
+	if err := json.Unmarshal(restrictionsJSON, &mapping.Restrictions); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal restrictions: %w", err)
+	}
+	if err := json.Unmarshal(requiredFieldsJSON, &mapping.RequiredFields); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal required_fields: %w", err)
+	}
+
+	return &mapping, nil
+}
+
+// ListProductRequirements returns all product requirements
+func (s *Store) ListProductRequirements(ctx context.Context) ([]ProductRequirements, error) {
+	query := `
+		SELECT pr.product_id, p.name as product_name, pr.entity_types, pr.required_dsl,
+		       pr.attributes, pr.compliance, pr.prerequisites, pr.conditional_rules,
+		       pr.created_at, pr.updated_at
+		FROM "dsl-ob-poc".product_requirements pr
+		JOIN "dsl-ob-poc".products p ON pr.product_id = p.product_id
+		ORDER BY pr.created_at DESC`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list product requirements: %w", err)
+	}
+	defer rows.Close()
+
+	var requirements []ProductRequirements
+	for rows.Next() {
+		var req ProductRequirements
+		var entityTypesJSON, requiredDSLJSON, attributesJSON, complianceJSON, prerequisitesJSON, conditionalRulesJSON []byte
+
+		err := rows.Scan(
+			&req.ProductID, &req.ProductName, &entityTypesJSON, &requiredDSLJSON,
+			&attributesJSON, &complianceJSON, &prerequisitesJSON, &conditionalRulesJSON,
+			&req.CreatedAt, &req.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan product requirement: %w", err)
+		}
+
+		// Unmarshal JSON fields
+		if err := json.Unmarshal(entityTypesJSON, &req.EntityTypes); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal entity_types: %w", err)
+		}
+		if err := json.Unmarshal(requiredDSLJSON, &req.RequiredDSL); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal required_dsl: %w", err)
+		}
+		if err := json.Unmarshal(attributesJSON, &req.Attributes); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal attributes: %w", err)
+		}
+		if err := json.Unmarshal(complianceJSON, &req.Compliance); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal compliance: %w", err)
+		}
+		if err := json.Unmarshal(prerequisitesJSON, &req.Prerequisites); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal prerequisites: %w", err)
+		}
+		if err := json.Unmarshal(conditionalRulesJSON, &req.ConditionalRules); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal conditional_rules: %w", err)
+		}
+
+		requirements = append(requirements, req)
+	}
+
+	return requirements, rows.Err()
+}
+
+// CreateProductRequirements creates new product requirements
+func (s *Store) CreateProductRequirements(ctx context.Context, req *ProductRequirements) error {
+	// Marshal JSON fields
+	entityTypesJSON, err := json.Marshal(req.EntityTypes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal entity_types: %w", err)
+	}
+	requiredDSLJSON, err := json.Marshal(req.RequiredDSL)
+	if err != nil {
+		return fmt.Errorf("failed to marshal required_dsl: %w", err)
+	}
+	attributesJSON, err := json.Marshal(req.Attributes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal attributes: %w", err)
+	}
+	complianceJSON, err := json.Marshal(req.Compliance)
+	if err != nil {
+		return fmt.Errorf("failed to marshal compliance: %w", err)
+	}
+	prerequisitesJSON, err := json.Marshal(req.Prerequisites)
+	if err != nil {
+		return fmt.Errorf("failed to marshal prerequisites: %w", err)
+	}
+	conditionalRulesJSON, err := json.Marshal(req.ConditionalRules)
+	if err != nil {
+		return fmt.Errorf("failed to marshal conditional_rules: %w", err)
+	}
+
+	query := `
+		INSERT INTO "dsl-ob-poc".product_requirements
+		(product_id, entity_types, required_dsl, attributes, compliance, prerequisites, conditional_rules, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`
+
+	_, err = s.db.ExecContext(ctx, query, req.ProductID, entityTypesJSON, requiredDSLJSON,
+		attributesJSON, complianceJSON, prerequisitesJSON, conditionalRulesJSON)
+	if err != nil {
+		return fmt.Errorf("failed to create product requirements: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateProductRequirements updates existing product requirements
+func (s *Store) UpdateProductRequirements(ctx context.Context, req *ProductRequirements) error {
+	// Marshal JSON fields
+	entityTypesJSON, err := json.Marshal(req.EntityTypes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal entity_types: %w", err)
+	}
+	requiredDSLJSON, err := json.Marshal(req.RequiredDSL)
+	if err != nil {
+		return fmt.Errorf("failed to marshal required_dsl: %w", err)
+	}
+	attributesJSON, err := json.Marshal(req.Attributes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal attributes: %w", err)
+	}
+	complianceJSON, err := json.Marshal(req.Compliance)
+	if err != nil {
+		return fmt.Errorf("failed to marshal compliance: %w", err)
+	}
+	prerequisitesJSON, err := json.Marshal(req.Prerequisites)
+	if err != nil {
+		return fmt.Errorf("failed to marshal prerequisites: %w", err)
+	}
+	conditionalRulesJSON, err := json.Marshal(req.ConditionalRules)
+	if err != nil {
+		return fmt.Errorf("failed to marshal conditional_rules: %w", err)
+	}
+
+	query := `
+		UPDATE "dsl-ob-poc".product_requirements
+		SET entity_types = $2, required_dsl = $3, attributes = $4, compliance = $5,
+		    prerequisites = $6, conditional_rules = $7, updated_at = NOW()
+		WHERE product_id = $1`
+
+	result, err := s.db.ExecContext(ctx, query, req.ProductID, entityTypesJSON, requiredDSLJSON,
+		attributesJSON, complianceJSON, prerequisitesJSON, conditionalRulesJSON)
+	if err != nil {
+		return fmt.Errorf("failed to update product requirements: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("product requirements not found for product %s", req.ProductID)
+	}
+
+	return nil
+}
+
+// CreateEntityProductMapping creates new entity-product mapping
+func (s *Store) CreateEntityProductMapping(ctx context.Context, mapping *EntityProductMapping) error {
+	// Marshal JSON fields
+	restrictionsJSON, err := json.Marshal(mapping.Restrictions)
+	if err != nil {
+		return fmt.Errorf("failed to marshal restrictions: %w", err)
+	}
+	requiredFieldsJSON, err := json.Marshal(mapping.RequiredFields)
+	if err != nil {
+		return fmt.Errorf("failed to marshal required_fields: %w", err)
+	}
+
+	query := `
+		INSERT INTO "dsl-ob-poc".entity_product_mappings
+		(entity_type, product_id, compatible, restrictions, required_fields, created_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())`
+
+	_, err = s.db.ExecContext(ctx, query, mapping.EntityType, mapping.ProductID,
+		mapping.Compatible, restrictionsJSON, requiredFieldsJSON)
+	if err != nil {
+		return fmt.Errorf("failed to create entity-product mapping: %w", err)
+	}
+
+	return nil
 }

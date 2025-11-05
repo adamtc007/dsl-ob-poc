@@ -9,6 +9,8 @@ import (
 )
 
 // MockAgent provides simulated AI responses for testing and demonstration
+// NOTE: This contains hardcoded response patterns. For production, use database-driven
+// rules and vocabulary to generate responses instead of hardcoded switch statements.
 type MockAgent struct{}
 
 // NewMockAgent creates a mock agent for testing without API keys
@@ -18,7 +20,8 @@ func NewMockAgent() *MockAgent {
 
 // CallKYCAgent simulates KYC discovery responses
 func (m *MockAgent) CallKYCAgent(ctx context.Context, naturePurpose string, products []string) (*dsl.KYCRequirements, error) {
-	// Simulate intelligent KYC requirements based on inputs
+	// FIXME: Replace hardcoded KYC rules with database-driven requirements
+	// These should come from product_requirements table and compliance_matrix
 	var docs []string
 	var jurisdictions []string
 
@@ -49,7 +52,8 @@ func (m *MockAgent) CallKYCAgent(ctx context.Context, naturePurpose string, prod
 		jurisdictions = append(jurisdictions, "US")
 	}
 
-	// Add product-specific requirements
+	// FIXME: Replace hardcoded product requirements with database lookup
+	// Should query product_requirements table for each product
 	for _, product := range products {
 		switch strings.ToUpper(product) {
 		case "TRANSFER_AGENT":
@@ -74,6 +78,7 @@ func (m *MockAgent) CallKYCAgent(ctx context.Context, naturePurpose string, prod
 }
 
 // CallDSLTransformationAgent simulates DSL transformation responses
+// FIXME: Replace hardcoded transformation logic with database-driven vocabulary
 func (m *MockAgent) CallDSLTransformationAgent(ctx context.Context, request DSLTransformationRequest) (*DSLTransformationResponse, error) {
 	instruction := strings.ToLower(request.Instruction)
 

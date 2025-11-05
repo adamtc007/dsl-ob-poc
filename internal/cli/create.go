@@ -7,7 +7,6 @@ import (
 
 	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/dsl"
-	"dsl-ob-poc/internal/mocks"
 	"dsl-ob-poc/internal/shared-dsl/session"
 	"dsl-ob-poc/internal/store"
 )
@@ -25,23 +24,35 @@ func RunCreate(ctx context.Context, ds datastore.DataStore, args []string) error
 		return fmt.Errorf("error: --cbu flag is required")
 	}
 
-	mockCBU, err := mocks.GetMockCBU(*cbuID)
+	// FIXED: Use database instead of hardcoded mock data
+	// First check if CBU exists in database
+	existingCBU, err := ds.GetCBUByName(ctx, *cbuID)
 	if err != nil {
-		return fmt.Errorf("failed to get mock data: %w", err)
+		// CBU doesn't exist, create it with default values
+		// In production, this should prompt for description and nature_purpose
+		cbuUUID, createErr := ds.CreateCBU(ctx, *cbuID, "Auto-created CBU", "Default onboarding case")
+		if createErr != nil {
+			return fmt.Errorf("failed to create CBU in database: %w", createErr)
+		}
+		// Retrieve the newly created CBU
+		existingCBU, err = ds.GetCBUByID(ctx, cbuUUID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve newly created CBU: %w", err)
+		}
 	}
 
 	// Create onboarding session in database
-	dbSession, err := ds.CreateOnboardingSession(ctx, mockCBU.CBUId)
+	dbSession, err := ds.CreateOnboardingSession(ctx, existingCBU.CBUID)
 	if err != nil {
 		return fmt.Errorf("failed to create onboarding session: %w", err)
 	}
 
 	// Create DSL session manager and accumulate DSL (single source of truth)
 	sessionMgr := session.NewManager()
-	sess := sessionMgr.GetOrCreate(mockCBU.CBUId, "onboarding")
+	sess := sessionMgr.GetOrCreate(existingCBU.CBUID, "onboarding")
 
-	// Generate the initial "CREATE" DSL through builder
-	newDSL := dsl.CreateCase(mockCBU.CBUId, mockCBU.NaturePurpose)
+	// Generate the initial "CREATE" DSL through builder using database CBU data
+	newDSL := dsl.CreateCase(existingCBU.CBUID, existingCBU.NaturePurpose)
 
 	// Accumulate DSL through state manager
 	err = sess.AccumulateDSL(newDSL)
@@ -51,13 +62,13 @@ func RunCreate(ctx context.Context, ds datastore.DataStore, args []string) error
 
 	// Get final DSL from state manager and save to database
 	finalDSL := sess.GetDSL()
-	versionID, err := ds.InsertDSLWithState(ctx, mockCBU.CBUId, finalDSL, store.StateCreated)
+	versionID, err := ds.InsertDSLWithState(ctx, existingCBU.CBUID, finalDSL, store.StateCreated)
 	if err != nil {
 		return fmt.Errorf("failed to save new case: %w", err)
 	}
 
 	// Update onboarding session with the new DSL version
-	err = ds.UpdateOnboardingState(ctx, mockCBU.CBUId, store.StateCreated, versionID)
+	err = ds.UpdateOnboardingState(ctx, existingCBU.CBUID, store.StateCreated, versionID)
 	if err != nil {
 		return fmt.Errorf("failed to update onboarding state: %w", err)
 	}

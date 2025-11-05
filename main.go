@@ -79,6 +79,21 @@ func run() int {
 		}
 		fmt.Println("Catalog seeded successfully with mock data.")
 
+	case "seed-product-requirements":
+		// Check for --verify flag
+		verify := false
+		for _, arg := range args {
+			if arg == "--verify" {
+				verify = true
+				break
+			}
+		}
+		err = cli.RunSeedProductRequirements(ctx, dataStore, verify)
+		if err != nil {
+			log.Printf("Failed to seed product requirements: %v", err)
+			return 1
+		}
+
 	case "create":
 		err = cli.RunCreate(ctx, dataStore, args)
 
@@ -170,6 +185,20 @@ func run() int {
 	case "history":
 		err = cli.RunHistory(ctx, dataStore, args)
 
+	// MULTI-DOMAIN ORCHESTRATION COMMANDS
+	case "orchestration-init-db":
+		err = cli.RunOrchestrationInitDB(ctx, dataStore, args)
+	case "orchestrate-create":
+		err = cli.RunOrchestrationCreate(ctx, dataStore, args)
+	case "orchestrate-execute":
+		err = cli.RunOrchestrationExecute(ctx, dataStore, args)
+	case "orchestrate-status":
+		err = cli.RunOrchestrationStatus(ctx, dataStore, args)
+	case "orchestrate-list":
+		err = cli.RunOrchestrationList(ctx, dataStore, args)
+	case "orchestrate-demo":
+		err = cli.RunOrchestrationDemo(ctx, dataStore, args)
+
 	// DSL LIFECYCLE MANAGEMENT COMMANDS (temporarily disabled for linting)
 	// case "dsl-lifecycle-create":
 	// 	err = cli.RunDSLLifecycleCreate(ctx, dataStore, args)
@@ -218,6 +247,17 @@ func run() int {
 	case "dsl-execute":
 		err = cli.RunDSLExecute(ctx, dataStore, args)
 
+	// PHASE 6 COMPILE-TIME OPTIMIZATION
+	case "optimize":
+		err = cli.RunOptimize(ctx, dataStore, args)
+
+	// PHASE 4 DATABASE MIGRATION
+	case "migrate-vocabulary":
+		err = cli.RunMigrateVocabulary(ctx, args)
+
+	case "test-db-vocabulary":
+		err = cli.RunTestDBVocabulary(ctx, args)
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
@@ -251,6 +291,7 @@ func printUsage() {
 	fmt.Println("\nSetup Commands:")
 	fmt.Println("  init-db                      (One-time) Initializes the PostgreSQL schema and all tables.")
 	fmt.Println("  seed-catalog                 (One-time) Populates catalog tables with mock data.")
+	fmt.Println("  seed-product-requirements    (Phase 5) Seeds product requirements into database.")
 	fmt.Println("\nState Machine Commands:")
 	fmt.Println("  create --cbu=<cbu-id>        (v1) Creates a new onboarding case.")
 	fmt.Println("  add-products --cbu=<cbu-id>  (v2) Adds products to an existing case.")
@@ -303,10 +344,37 @@ func printUsage() {
 	fmt.Println("\nUtility Commands:")
 	fmt.Println("  history --cbu=<cbu-id>       Views the full, versioned DSL evolution for a case.")
 	fmt.Println("  export-mock-data [--dir=<path>] Exports existing database records to JSON mock files")
+	fmt.Println("\nMulti-Domain Orchestration Commands:")
+	fmt.Println("  orchestration-init-db        (One-time) Initialize orchestration session tables")
+	fmt.Println("  orchestrate-create --entity-name=<name> --entity-type=<type> [--products=<list>]")
+	fmt.Println("                     Create a new multi-domain orchestrated workflow")
+	fmt.Println("  orchestrate-execute --session-id=<id> --instruction=<text>")
+	fmt.Println("                     Execute an instruction across multiple domains")
+	fmt.Println("  orchestrate-status --session-id=<id> [--show-dsl]")
+	fmt.Println("                     Show status of an orchestration session")
+	fmt.Println("  orchestrate-list [--metrics]")
+	fmt.Println("                     List all active orchestration sessions")
+	fmt.Println("  orchestrate-demo [--entity-type=<type>] [--fast]")
+	fmt.Println("                     Run a comprehensive orchestration demo")
 	fmt.Println("\nDSL Execution Engine:")
 	fmt.Println("  dsl-execute [--cbu=<cbu-id>] [--demo] [--file=<path>] [dsl-command]")
 	fmt.Println("              Execute S-expression DSL commands with UUID attribute handling")
 	fmt.Println("              --demo: Run comprehensive demo workflow")
 	fmt.Println("              --file: Execute commands from file")
 	fmt.Println("              Interactive mode if no command specified")
+	fmt.Println("\nPhase 4 Database Migration:")
+	fmt.Println("  migrate-vocabulary [--domain=<domain>] [--all] [--verify] [--cleanup] [--dry-run]")
+	fmt.Println("                     Migrate hardcoded vocabularies to database storage")
+	fmt.Println("                     --domain: Migrate specific domain (onboarding, hedge-fund-investor, orchestration)")
+	fmt.Println("                     --all: Migrate all domains")
+	fmt.Println("                     --verify: Verify migration integrity")
+	fmt.Println("                     --cleanup: Remove hardcoded references (WARNING: modifies code)")
+	fmt.Println("                     --dry-run: Show what would be migrated without making changes")
+	fmt.Println("  test-db-vocabulary [--domain=<domain>] [--verb=<verb>] [--dsl=<dsl>]")
+	fmt.Println("                     Test database-backed vocabulary validation (Phase 4 verification)")
+	fmt.Println("\nPhase 6 Compile-Time Optimization:")
+	fmt.Println("  optimize --cbu=<cbu-id> [--output=<file>] [--format=json|yaml|text] [--strategy=BALANCED|COST_OPTIMIZED|PERFORMANCE_OPTIMIZED]")
+	fmt.Println("           [--max-cost=<amount>] [--session-id=<id>] [--save-results] [--verbose]")
+	fmt.Println("                     Perform compile-time optimization and execution planning for DSL documents")
+	fmt.Println("                     Includes dependency analysis, resource optimization, and execution planning")
 }

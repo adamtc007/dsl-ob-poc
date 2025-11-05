@@ -217,7 +217,8 @@ func runSingleEntityUBOWorkflow(ctx context.Context, ds datastore.DataStore, ent
 		cbuID = fmt.Sprintf("CBU-%s-001", strings.ToUpper(entityType[:4]))
 	}
 
-	cmd := entity_ubo_workflows.
+	return entity_ubo_workflows.RunEntityUBODemo(ctx, ds)
+}
 
 // parseUBOFlags parses command line flags into UBODiscoveryRequest
 func parseUBOFlags(args []string) (*UBODiscoveryRequest, bool, bool, error) {

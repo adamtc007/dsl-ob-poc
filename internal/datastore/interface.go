@@ -3,6 +3,7 @@ package datastore
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"dsl-ob-poc/internal/dictionary"
 	"dsl-ob-poc/internal/mocks"
@@ -70,10 +71,30 @@ type DataStore interface {
 	GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.Attribute, error)
 	GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error)
 
+	// Product Requirements Operations (Phase 5)
+	GetProductRequirements(ctx context.Context, productID string) (*store.ProductRequirements, error)
+	GetEntityProductMapping(ctx context.Context, entityType, productID string) (*store.EntityProductMapping, error)
+	ListProductRequirements(ctx context.Context) ([]store.ProductRequirements, error)
+	CreateProductRequirements(ctx context.Context, req *store.ProductRequirements) error
+	UpdateProductRequirements(ctx context.Context, req *store.ProductRequirements) error
+	CreateEntityProductMapping(ctx context.Context, mapping *store.EntityProductMapping) error
+
 	// Catalog Seeding (for database initialization)
 	SeedCatalog(ctx context.Context) error
+	SeedProductRequirements(ctx context.Context) error
 	InitDB(ctx context.Context) error
+
+	// Orchestration session persistence methods
+	SaveOrchestrationSession(ctx context.Context, session *store.OrchestrationSessionData) error
+	LoadOrchestrationSession(ctx context.Context, sessionID string) (*store.OrchestrationSessionData, error)
+	ListActiveOrchestrationSessions(ctx context.Context) ([]string, error)
+	DeleteOrchestrationSession(ctx context.Context, sessionID string) error
+	CleanupExpiredOrchestrationSessions(ctx context.Context) (int64, error)
+	UpdateOrchestrationSessionDSL(ctx context.Context, sessionID, dsl string, version int) error
 }
+
+// Phase 5 Product Requirements Types are now defined in the store package
+// Use store.ProductRequirements, store.EntityProductMapping, etc.
 
 // DataStoreType represents the type of data store to use
 type Type string
@@ -266,8 +287,61 @@ func (p *postgresAdapter) SeedCatalog(ctx context.Context) error {
 	return p.store.SeedCatalog(ctx)
 }
 
+func (p *postgresAdapter) SeedProductRequirements(ctx context.Context) error {
+	return p.store.SeedProductRequirements(ctx)
+}
+
+// Product Requirements Operations (Phase 5)
+func (p *postgresAdapter) GetProductRequirements(ctx context.Context, productID string) (*store.ProductRequirements, error) {
+	return p.store.GetProductRequirements(ctx, productID)
+}
+
+func (p *postgresAdapter) GetEntityProductMapping(ctx context.Context, entityType, productID string) (*store.EntityProductMapping, error) {
+	return p.store.GetEntityProductMapping(ctx, entityType, productID)
+}
+
+func (p *postgresAdapter) ListProductRequirements(ctx context.Context) ([]store.ProductRequirements, error) {
+	return p.store.ListProductRequirements(ctx)
+}
+
+func (p *postgresAdapter) CreateProductRequirements(ctx context.Context, req *store.ProductRequirements) error {
+	return p.store.CreateProductRequirements(ctx, req)
+}
+
+func (p *postgresAdapter) UpdateProductRequirements(ctx context.Context, req *store.ProductRequirements) error {
+	return p.store.UpdateProductRequirements(ctx, req)
+}
+
+func (p *postgresAdapter) CreateEntityProductMapping(ctx context.Context, mapping *store.EntityProductMapping) error {
+	return p.store.CreateEntityProductMapping(ctx, mapping)
+}
+
 func (p *postgresAdapter) InitDB(ctx context.Context) error {
 	return p.store.InitDB(ctx)
+}
+
+func (p *postgresAdapter) SaveOrchestrationSession(ctx context.Context, session *store.OrchestrationSessionData) error {
+	return p.store.SaveOrchestrationSession(ctx, session)
+}
+
+func (p *postgresAdapter) LoadOrchestrationSession(ctx context.Context, sessionID string) (*store.OrchestrationSessionData, error) {
+	return p.store.LoadOrchestrationSession(ctx, sessionID)
+}
+
+func (p *postgresAdapter) ListActiveOrchestrationSessions(ctx context.Context) ([]string, error) {
+	return p.store.ListActiveOrchestrationSessions(ctx)
+}
+
+func (p *postgresAdapter) DeleteOrchestrationSession(ctx context.Context, sessionID string) error {
+	return p.store.DeleteOrchestrationSession(ctx, sessionID)
+}
+
+func (p *postgresAdapter) CleanupExpiredOrchestrationSessions(ctx context.Context) (int64, error) {
+	return p.store.CleanupExpiredOrchestrationSessions(ctx)
+}
+
+func (p *postgresAdapter) UpdateOrchestrationSessionDSL(ctx context.Context, sessionID, dsl string, version int) error {
+	return p.store.UpdateOrchestrationSessionDSL(ctx, sessionID, dsl, version)
 }
 
 // Export Operations for postgres adapter
@@ -392,6 +466,35 @@ func (m *mockAdapter) SeedCatalog(ctx context.Context) error {
 	return nil // Mock store doesn't need seeding
 }
 
+func (m *mockAdapter) SeedProductRequirements(ctx context.Context) error {
+	return nil // Mock store doesn't need seeding
+}
+
+// Product Requirements Operations (Phase 5) - Mock implementations
+func (m *mockAdapter) GetProductRequirements(ctx context.Context, productID string) (*store.ProductRequirements, error) {
+	return nil, fmt.Errorf("DEPRECATED: product requirements mocks disabled - use database via PostgreSQL adapter")
+}
+
+func (m *mockAdapter) GetEntityProductMapping(ctx context.Context, entityType, productID string) (*store.EntityProductMapping, error) {
+	return nil, fmt.Errorf("DEPRECATED: entity product mapping mocks disabled - use database via PostgreSQL adapter")
+}
+
+func (m *mockAdapter) ListProductRequirements(ctx context.Context) ([]store.ProductRequirements, error) {
+	return nil, fmt.Errorf("DEPRECATED: product requirements list mocks disabled - use database via PostgreSQL adapter")
+}
+
+func (m *mockAdapter) CreateProductRequirements(ctx context.Context, req *store.ProductRequirements) error {
+	return fmt.Errorf("DEPRECATED: product requirements creation mocks disabled - use database via PostgreSQL adapter")
+}
+
+func (m *mockAdapter) UpdateProductRequirements(ctx context.Context, req *store.ProductRequirements) error {
+	return fmt.Errorf("DEPRECATED: product requirements update mocks disabled - use database via PostgreSQL adapter")
+}
+
+func (m *mockAdapter) CreateEntityProductMapping(ctx context.Context, mapping *store.EntityProductMapping) error {
+	return fmt.Errorf("DEPRECATED: entity product mapping creation mocks disabled - use database via PostgreSQL adapter")
+}
+
 func (m *mockAdapter) InitDB(ctx context.Context) error {
 	return nil // Mock store doesn't need DB initialization
 }
@@ -444,4 +547,28 @@ func (m *mockAdapter) GetAllDictionaryAttributes(ctx context.Context) ([]diction
 
 func (m *mockAdapter) GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error) {
 	return m.store.GetAllDSLRecords(ctx)
+}
+
+func (m *mockAdapter) SaveOrchestrationSession(ctx context.Context, session *store.OrchestrationSessionData) error {
+	return m.store.SaveOrchestrationSession(ctx, session)
+}
+
+func (m *mockAdapter) LoadOrchestrationSession(ctx context.Context, sessionID string) (*store.OrchestrationSessionData, error) {
+	return m.store.LoadOrchestrationSession(ctx, sessionID)
+}
+
+func (m *mockAdapter) ListActiveOrchestrationSessions(ctx context.Context) ([]string, error) {
+	return m.store.ListActiveOrchestrationSessions(ctx)
+}
+
+func (m *mockAdapter) DeleteOrchestrationSession(ctx context.Context, sessionID string) error {
+	return m.store.DeleteOrchestrationSession(ctx, sessionID)
+}
+
+func (m *mockAdapter) CleanupExpiredOrchestrationSessions(ctx context.Context) (int64, error) {
+	return m.store.CleanupExpiredOrchestrationSessions(ctx)
+}
+
+func (m *mockAdapter) UpdateOrchestrationSessionDSL(ctx context.Context, sessionID, dsl string, version int) error {
+	return m.store.UpdateOrchestrationSessionDSL(ctx, sessionID, dsl, version)
 }

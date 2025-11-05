@@ -266,6 +266,37 @@ func (m *MockStore) GetResourcesForService(ctx context.Context, serviceID string
 	return resources, nil
 }
 
+// Orchestration session methods (mock implementations)
+func (m *MockStore) SaveOrchestrationSession(ctx context.Context, session *store.OrchestrationSessionData) error {
+	// In mock mode, just return success - sessions are not persisted
+	return nil
+}
+
+func (m *MockStore) LoadOrchestrationSession(ctx context.Context, sessionID string) (*store.OrchestrationSessionData, error) {
+	// In mock mode, return error as sessions are not persisted
+	return nil, fmt.Errorf("orchestration session not found: %s", sessionID)
+}
+
+func (m *MockStore) ListActiveOrchestrationSessions(ctx context.Context) ([]string, error) {
+	// In mock mode, return empty list
+	return []string{}, nil
+}
+
+func (m *MockStore) DeleteOrchestrationSession(ctx context.Context, sessionID string) error {
+	// In mock mode, return error as sessions don't exist
+	return fmt.Errorf("session not found: %s", sessionID)
+}
+
+func (m *MockStore) CleanupExpiredOrchestrationSessions(ctx context.Context) (int64, error) {
+	// In mock mode, return 0 cleaned sessions
+	return 0, nil
+}
+
+func (m *MockStore) UpdateOrchestrationSessionDSL(ctx context.Context, sessionID, dsl string, version int) error {
+	// In mock mode, return error as sessions don't exist
+	return fmt.Errorf("session not found: %s", sessionID)
+}
+
 // Additional helper methods for mock testing
 func (m *MockStore) GetAllProducts(ctx context.Context) ([]store.Product, error) {
 	if err := m.loadData(); err != nil {
