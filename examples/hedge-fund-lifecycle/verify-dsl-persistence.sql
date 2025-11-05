@@ -51,7 +51,7 @@ SELECT
               AND table_name = 'hf_dsl_executions'
         )
         THEN '✓ Table "hf-investor".hf_dsl_executions exists'
-        ELSE '✗ Table NOT FOUND - Run migration: hedge-fund-investor-source/sql/migration_hedge_fund_investor.sql'
+        ELSE '✗ Table NOT FOUND - Run: psql "$DB_URL" -f sql/init.sql'
     END as status;
 
 \echo ''

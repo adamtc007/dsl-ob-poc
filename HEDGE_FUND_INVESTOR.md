@@ -39,7 +39,7 @@ This system implements a complete hedge fund investor register with:
 
 ### File Locations
 - **Source Code**: `hedge-fund-investor-source/`
-- **SQL Migration**: `hedge-fund-investor-source/sql/migration_hedge_fund_investor.sql`
+- **SQL Schema**: Included in main `sql/init.sql`
 - **CLI Commands**: `hedge-fund-investor-source/shared-cli/hf_*.go`
 - **Domain Models**: `hedge-fund-investor-source/hf-investor/domain/`
 - **DSL Vocabulary**: `hedge-fund-investor-source/hf-investor/dsl/hedge_fund_dsl.go`
@@ -206,7 +206,7 @@ CREATE TABLE hf_register_lots (
 
 ```bash
 # Apply hedge fund schema
-psql "$DB_URL" -f sql/migration_hedge_fund_investor.sql
+psql "$DB_URL" -f sql/init.sql
 
 # Or using Goose
 goose -dir sql postgres $DB_URL up
@@ -660,7 +660,7 @@ CREATE SCHEMA IF NOT EXISTS "hf-investor";
 ### Running Hedge Fund Commands
 ```bash
 # Initialize hedge fund schema (one-time)
-psql "$DB_CONN_STRING" -f hedge-fund-investor-source/sql/migration_hedge_fund_investor.sql
+psql "$DB_CONN_STRING" -f sql/init.sql
 
 # Run hedge fund commands
 ./dsl-poc hf-create-investor --code="INV-001" --legal-name="Acme LP" --type="CORPORATE" --domicile="US"
@@ -700,7 +700,7 @@ export DSL_MOCK_DATA_PATH=hedge-fund-investor-source/hf-investor/mocks
 ### Production Deployment
 ```bash
 # 1. Apply migration
-psql "$PROD_DB_URL" -f hedge-fund-investor-source/sql/migration_hedge_fund_investor.sql
+psql "$PROD_DB_URL" -f sql/init.sql
 
 # 2. Configure environment
 export DSL_STORE_TYPE=postgresql

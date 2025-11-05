@@ -199,22 +199,6 @@ func run() int {
 	case "orchestrate-demo":
 		err = cli.RunOrchestrationDemo(ctx, dataStore, args)
 
-	// DSL LIFECYCLE MANAGEMENT COMMANDS (temporarily disabled for linting)
-	// case "dsl-lifecycle-create":
-	// 	err = cli.RunDSLLifecycleCreate(ctx, dataStore, args)
-	// case "dsl-lifecycle-extend":
-	// 	err = cli.RunDSLLifecycleExtend(ctx, dataStore, args)
-	// case "dsl-lifecycle-transition":
-	// 	err = cli.RunDSLLifecycleTransition(ctx, dataStore, args)
-	// case "dsl-lifecycle-status":
-	// 	err = cli.RunDSLLifecycleStatus(ctx, dataStore, args)
-	// case "dsl-lifecycle-history":
-	// 	err = cli.RunDSLLifecycleHistory(ctx, dataStore, args)
-	// case "dsl-lifecycle-execute":
-	// 	err = cli.RunDSLLifecycleExecute(ctx, dataStore, args)
-	// case "dsl-lifecycle-archive":
-	// 	err = cli.RunDSLLifecycleArchive(ctx, dataStore, args)
-
 	// CBU CRUD COMMANDS
 	case "cbu-create":
 		err = cli.RunCBUCreate(ctx, dataStore, args)
@@ -305,20 +289,6 @@ func printUsage() {
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v8) Resolves and binds attribute values deterministically.")
 
 	fmt.Println("\nDSL Lifecycle Management Commands:")
-	fmt.Println("  dsl-lifecycle-create --domain=<domain> [--client-name=<name>] [--cbu-id=<id>]")
-	fmt.Println("  dsl-lifecycle-extend --onboarding-id=<id> --dsl-fragment=<dsl> --domain-state=<state>")
-	fmt.Println("  dsl-lifecycle-transition --onboarding-id=<id> --lifecycle-state=<state>")
-	fmt.Println("  dsl-lifecycle-status --onboarding-id=<id> [--json]")
-	fmt.Println("  dsl-lifecycle-history --onboarding-id=<id> [--json]")
-	fmt.Println("  dsl-lifecycle-execute --onboarding-id=<id> [--dry-run]")
-	fmt.Println("  dsl-lifecycle-archive --onboarding-id=<id> [--reason=<reason>]")
-	fmt.Println("                 Create a new DSL case with optional domain-specific details")
-	fmt.Println("  dsl-update-case --onboarding-id=<id> --state=<new_state> [--dsl=<dsl_fragment>]")
-	fmt.Println("                 Update an existing DSL case with a new state and optional DSL fragment")
-	fmt.Println("  dsl-get-case --onboarding-id=<id>")
-	fmt.Println("                 Retrieve full details of a specific DSL case")
-	fmt.Println("  dsl-list-cases")
-	fmt.Println("                 List all active DSL case IDs")
 
 	fmt.Println("\nAI Agent Commands (requires GEMINI_API_KEY):")
 	fmt.Println("  agent-transform --cbu=<cbu-id>   AI-powered DSL transformation with natural language instructions")

@@ -25,12 +25,25 @@ coverage.out
 coverage.html
 
 ############################
-# Local caches
+# Go caches & modules
 ############################
 /.gocache/
 /.gomodcache/
 /.cache/
 /.golangci-lint.cache
+/go/
+vendor/
+go.work
+go.work.sum
+
+############################
+# Test artifacts
+############################
+*.test
+*.prof
+testdata/output/
+test-results/
+junit.xml
 
 ############################
 # Mock data (generated)
@@ -38,18 +51,50 @@ coverage.html
 /data/mocks/
 
 ############################
-# Logs & misc
+# Logs & runtime files
 ############################
 *.log
-.DS_Store
-*.zip
-*.patch
-*.diff
+*.pid
+nohup.out
+debug.log
+error.log
 
 ############################
-# Test output files
+# OS files
 ############################
-*.txt
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+############################
+# Temporary files
+############################
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.rej
+*~
+.#*
+#*#
+
+############################
+# Archives & patches
+############################
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.patch
+*.diff
 
 ############################
 # IDE & Editor files
@@ -58,9 +103,40 @@ coverage.html
 .idea/
 *.swp
 *.swo
+*.vim
+.netrwhist
 *~
+.project
+.classpath
+.settings/
+.metadata/
+*.sublime-*
+
+############################
+# Database files
+############################
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+
+############################
+# Environment files
+############################
+.env
+.env.local
+.env.*.local
+.envrc
+*.env
 
 ############################
 # Legacy/duplicate source dumps
 ############################
 /dsl-ob-poc-src/
+
+############################
+# Documentation build artifacts
+############################
+docs/_build/
+docs/site/
+*.pdf
