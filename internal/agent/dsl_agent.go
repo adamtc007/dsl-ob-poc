@@ -54,6 +54,11 @@ APPROVED DSL VERBS (MUST USE ONLY THESE):
 - entity.register, entity.classify, entity.link, identity.verify, identity.attest
 - products.add, products.configure, services.discover, services.provision, services.activate
 - kyc.start, kyc.collect, kyc.verify, kyc.assess, compliance.screen, compliance.monitor
+- ubo.collect-entity-data, ubo.get-ownership-structure, ubo.unroll-structure, ubo.resolve-ubos
+- ubo.calculate-indirect-ownership, ubo.identify-control-prong, ubo.apply-thresholds
+- ubo.identify-trust-parties, ubo.resolve-trust-ubos, ubo.identify-ownership-prong, ubo.resolve-partnership-ubos
+- ubo.recursive-entity-resolve, ubo.identify-fincen-control-roles, ubo.apply-fincen-control-prong
+- ubo.verify-identity, ubo.screen-person, ubo.assess-risk, ubo.monitor-changes, ubo.refresh-data
 - resources.plan, resources.provision, resources.configure, resources.test, resources.deploy
 - attributes.define, attributes.resolve, values.bind, values.validate, values.encrypt
 - workflow.transition, workflow.gate, tasks.create, tasks.assign, tasks.complete
@@ -300,6 +305,29 @@ func validateDSLVerbs(dsl string) error {
 		"kyc.assess":         true,
 		"compliance.screen":  true,
 		"compliance.monitor": true,
+		// UBO Ultimate Beneficial Ownership
+		"ubo.collect-entity-data":          true,
+		"ubo.get-ownership-structure":      true,
+		"ubo.unroll-structure":             true,
+		"ubo.resolve-ubos":                 true,
+		"ubo.calculate-indirect-ownership": true,
+		"ubo.identify-control-prong":       true,
+		"ubo.apply-thresholds":             true,
+		"ubo.verify-identity":              true,
+		"ubo.screen-person":                true,
+		"ubo.assess-risk":                  true,
+		"ubo.monitor-changes":              true,
+		"ubo.refresh-data":                 true,
+		"ubo.trigger-review":               true,
+		// Entity-Type-Specific UBO Workflows
+		"ubo.identify-trust-parties":   true,
+		"ubo.resolve-trust-ubos":       true,
+		"ubo.identify-ownership-prong": true,
+		"ubo.resolve-partnership-ubos": true,
+		"ubo.recursive-entity-resolve": true,
+		// FinCEN Control Prong Specific
+		"ubo.identify-fincen-control-roles": true,
+		"ubo.apply-fincen-control-prong":    true,
 		// Resource Infrastructure
 		"resources.plan":      true,
 		"resources.provision": true,

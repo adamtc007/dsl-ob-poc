@@ -120,6 +120,54 @@ func TestValidateDSLVerbs(t *testing.T) {
 			wantError: false,
 		},
 		{
+			name: "All UBO verbs - entity discovery",
+			dsl: `(ubo.collect-entity-data (entity_name "Acme Corp") (jurisdiction "GB"))
+(ubo.get-ownership-structure (entity_id "entity-1") (depth_limit 5))
+(ubo.unroll-structure (entity_id "entity-1") (consolidation_method "ADDITIVE"))`,
+			wantError: false,
+		},
+		{
+			name: "All UBO verbs - identification",
+			dsl: `(ubo.resolve-ubos (entity_id "entity-1") (ownership_threshold 25.0))
+(ubo.calculate-indirect-ownership (person_id "person-1") (target_entity_id "entity-1"))
+(ubo.identify-control-prong (entity_id "entity-1") (control_types "CEO"))
+(ubo.apply-thresholds (ownership_results "data-1") (control_results "data-2"))`,
+			wantError: false,
+		},
+		{
+			name: "All UBO verbs - verification and monitoring",
+			dsl: `(ubo.verify-identity (ubo_id "ubo-1") (document_list "passport"))
+(ubo.screen-person (ubo_id "ubo-1") (screening_lists "OFAC"))
+(ubo.assess-risk (entity_id "entity-1") (ubo_list "ubos-1"))
+(ubo.monitor-changes (entity_id "entity-1") (monitoring_frequency "MONTHLY"))
+(ubo.refresh-data (entity_id "entity-1") (data_sources "REGISTRY"))
+(ubo.trigger-review (entity_id "entity-1") (review_reason "COMPLEX_STRUCTURE"))`,
+			wantError: false,
+		},
+		{
+			name: "Trust-specific UBO verbs",
+			dsl: `(ubo.identify-trust-parties (trust_id "trust-1") (parties_to_identify ["SETTLORS", "TRUSTEES", "BENEFICIARIES"]))
+(ubo.resolve-trust-ubos (trust_id "trust-1") (regulatory_framework "FATF_TRUST_GUIDANCE"))`,
+			wantError: false,
+		},
+		{
+			name: "Partnership-specific UBO verbs",
+			dsl: `(ubo.identify-ownership-prong (partnership_id "fund-1") (ownership_threshold 25.0))
+(ubo.resolve-partnership-ubos (partnership_id "fund-1") (regulatory_framework "EU_5MLD"))`,
+			wantError: false,
+		},
+		{
+			name:      "Recursive entity resolution verb",
+			dsl:       `(ubo.recursive-entity-resolve (parent_entity_id "entity-1") (max_depth 5))`,
+			wantError: false,
+		},
+		{
+			name: "FinCEN Control Prong verbs",
+			dsl: `(ubo.identify-fincen-control-roles (entity_id "entity-1") (control_hierarchy ["CEO", "CFO", "COO"]))
+(ubo.apply-fincen-control-prong (entity_id "entity-1") (selection_method "FINCEN_HIERARCHY_RULE"))`,
+			wantError: false,
+		},
+		{
 			name: "All temporal verbs",
 			dsl: `(schedule.create (task.id "task-1") (cron "0 0 * * *"))
 (deadline.set (task.id "task-1") (date "2024-12-31"))
