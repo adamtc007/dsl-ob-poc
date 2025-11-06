@@ -71,8 +71,8 @@ linters-settings:
       - fmt.Printf
       - fmt.Print
       - log.Printf
-    # Ignore test helper errors
-    ignore: fmt:.*,log:.*
+      - fmt:.*
+      - log:.*
 
   govet:
     enable:
@@ -126,6 +126,9 @@ linters-settings:
 
   dupl:
     threshold: 200
+
+  staticcheck:
+    checks: ["all"]
 
   gocritic:
     enabled-tags:
