@@ -6,6 +6,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **DSL Onboarding POC** is a Go-based proof-of-concept for a client onboarding Domain-Specific Language (DSL) system. It implements an immutable, versioned state machine that tracks client onboarding progression through stages while generating S-expression DSL output.
 
+## 🚀 Quick Start
+
+### Prerequisites
+- Go 1.21+ (for `greenteagc` garbage collector)
+- PostgreSQL database
+- (Optional) Google Gemini API key for AI-assisted KYC discovery
+
+### Setup & First Run
+```bash
+# 1. Set database connection
+export DB_CONN_STRING="postgres://localhost:5432/postgres?sslmode=disable"
+
+# 2. Build the application
+make build-greenteagc
+
+# 3. Initialize database schema
+make init-db
+
+# 4. Seed with catalog data
+./dsl-poc seed-catalog
+
+# 5. Create your first onboarding case
+./dsl-poc create --cbu="CBU-1234" --nature-purpose="UCITS equity fund"
+
+# 6. Add products
+./dsl-poc add-products --cbu="CBU-1234" --products="CUSTODY,FUND_ACCOUNTING"
+
+# 7. View the accumulated DSL history
+./dsl-poc history --cbu="CBU-1234"
+```
+
+### Environment Variables
+- **`DB_CONN_STRING`** (required) - PostgreSQL connection string
+  - Format: `postgres://user:password@host:port/database?sslmode=disable`
+  - Example: `postgres://localhost:5432/postgres?sslmode=disable`
+
+- **`GEMINI_API_KEY`** (optional) - Google Gemini API key for AI-assisted operations
+  - Required for: `discover-kyc`, `discover-services`, `discover-resources` commands
+  - Get key from: https://ai.google.dev/
+  - If not provided, commands gracefully skip AI generation
+
 ## 🏗️ Core Architectural Pattern: **DSL-as-State**
 
 **This is the fundamental pattern that makes the entire system work.**
@@ -60,12 +101,7 @@ The DSL is not just a representation of state—**the DSL IS the state itself**.
 - `discover-resources` → Appends resource plan
 - `history` → Shows DSL evolution over time
 
-**Hedge Fund Investor Module** (`hedge-fund-investor-source/web/`):
-- `ChatSession.BuiltDSL` → Accumulated DSL throughout conversation
-- Each chat message generates DSL fragment
-- Fragments accumulate into complete investor onboarding DSL
-- Resolves entity UUIDs (investor, fund, class) from context
-- Entire conversation state visible in one DSL document
+Each command appends to the accumulated DSL document, creating new versions while maintaining complete audit trail of all onboarding decisions.
 
 ### Key Architectural Benefits
 
@@ -91,38 +127,19 @@ The DSL is not just a representation of state—**the DSL IS the state itself**.
 ### DSL Verb Validation (Completed)
 **Problem**: AI agents could generate unapproved DSL verbs, leading to hallucinated operations.
 
-**Solution**: Implemented verb validation in both systems:
+**Solution**: Implemented verb validation system:
 - **Main Onboarding POC** (`internal/agent/dsl_agent.go`): Added `validateDSLVerbs()` function with 70+ approved verbs
-- **Hedge Fund Module** (`hedge-fund-investor-source/web/internal/hf-agent/`): Already had validation with 17 approved verbs
 - Validation occurs after AI generation, before DSL is stored
 - System prompt explicitly lists approved verbs as constraints
 - Comprehensive test coverage (`internal/agent/dsl_agent_test.go`)
 
 **Impact**: Prevents AI from inventing operations, ensures DSL correctness, maintains domain vocabulary integrity.
 
-### Stateful DSL Accumulation (Completed)
-**Problem**: Hedge fund chat wasn't maintaining accumulated DSL state with resolved UUIDs. Each message generated standalone DSL snippets with placeholders like `<investor_id>`.
-
-**Solution**: Implemented accumulated DSL pattern in chat interface:
-- **ChatSession.BuiltDSL** (`hedge-fund-investor-source/web/server.go`): Maintains full accumulated DSL throughout conversation
-- **Context Resolution**: Tracks investor_id, fund_id, class_id, etc. across messages
-- **UUID Resolution**: Replaces placeholders with actual UUIDs from context via `resolveDSLPlaceholders()`
-- **ExistingDSL Context**: Passes accumulated DSL to agent for subsequent operations
-- **System Prompt Updates**: Explicitly instructs AI to use actual context values instead of placeholders
-
-**Example Flow**:
-1. User: "Create opportunity for Henry Cearns" → Generates UUID, stores in context
-2. User: "Start KYC" → Uses UUID from context, appends to BuiltDSL
-3. User: "Collect document" → Uses same UUID, accumulates in BuiltDSL
-4. Result: Complete onboarding journey visible in single DSL document
-
-**Impact**: Chat state now mirrors main POC's versioned DSL pattern. Complete audit trail. Referential integrity across operations.
-
 ### Testing & Verification
 - ✅ Verb validation: 20+ test cases covering all 70+ approved verbs
-- ✅ Chat accumulation: Tested 3-step workflow (opportunity → KYC → collect-doc)
-- ✅ UUID resolution: Verified no `<investor_id>` placeholders in output
-- ✅ Both systems operational and tested
+- ✅ DSL accumulation: Complete workflow tested (create → add-products → discover-kyc → discover-services → discover-resources)
+- ✅ State machine progression validated across all commands
+- ✅ Event sourcing and versioning operational
 
 ---
 
@@ -295,121 +312,78 @@ Dictionary = Metadata-driven type system with governance
 Result: Self-describing, evolvable, auditable, compliant state machine
 ```
 
-### Concrete Example: Hedge Fund Investor Onboarding
+### Concrete Example: Client Onboarding Workflow
 
-**Session starts - no state yet**
-
-**User**: "Create opportunity for Acme Capital LP, a Swiss corporate investor"
+**Command 1: Create case**
+```bash
+./dsl-poc create --cbu="CBU-1234" --nature-purpose="UCITS equity fund domiciled in LU"
+```
 
 **System generates DSL (State Version 1)**:
 ```lisp
-(investor.start-opportunity
-  @attr{a1b2c3d4-...}  ; investor_id (generated UUID)
-  @attr{e5f6a7b8-...}  ; investor.legal_name = "Acme Capital LP"
-  @attr{c9d0e1f2-...}  ; investor.type = "CORPORATE"
-  @attr{a3b4c5d6-...}  ; investor.domicile = "CH"
+(case.create
+  (cbu.id "CBU-1234")
+  (nature-purpose "UCITS equity fund domiciled in LU")
 )
 ```
 
-**Dictionary lookups**:
-- `a1b2c3d4-...` → `investor_id` (uuid, primary key)
-- `e5f6a7b8-...` → `investor.legal_name` (string, PII, required)
-- `c9d0e1f2-...` → `investor.type` (enum: INDIVIDUAL|CORPORATE|TRUST|FOHF)
-- `a3b4c5d6-...` → `investor.domicile` (string, ISO-3166-1 alpha-2)
-
-**Chat State**:
-```json
-{
-  "session_id": "uuid-session",
-  "built_dsl": "(investor.start-opportunity @attr{a1b2c3d4-...} ...)",
-  "context": {
-    "investor_id": "a1b2c3d4-...",
-    "investor_name": "Acme Capital LP",
-    "investor_type": "CORPORATE",
-    "current_state": "OPPORTUNITY"
-  }
-}
-```
+**Database State**: Version 1 stored with `cbu_id="CBU-1234"`, `version=1`
 
 ---
 
-**User**: "Start KYC for this investor"
-
-**System uses context** (investor_id from previous state) and **generates new DSL fragment**:
-```lisp
-(kyc.begin
-  @attr{a1b2c3d4-...}  ; investor_id (from context!)
-  @attr{f7g8h9i0-...}  ; kyc.tier = "STANDARD"
-)
+**Command 2: Add products**
+```bash
+./dsl-poc add-products --cbu="CBU-1234" --products="CUSTODY,FUND_ACCOUNTING"
 ```
 
 **System accumulates DSL (State Version 2)**:
 ```lisp
-(investor.start-opportunity
-  @attr{a1b2c3d4-...}
-  @attr{e5f6a7b8-...}
-  @attr{c9d0e1f2-...}
-  @attr{a3b4c5d6-...}
+(case.create
+  (cbu.id "CBU-1234")
+  (nature-purpose "UCITS equity fund domiciled in LU")
 )
 
-(kyc.begin
-  @attr{a1b2c3d4-...}  ; SAME investor_id - referential integrity!
-  @attr{f7g8h9i0-...}
-)
+(products.add "CUSTODY" "FUND_ACCOUNTING")
 ```
 
-**Dictionary lookups**:
-- `f7g8h9i0-...` → `kyc.tier` (enum: SIMPLIFIED|STANDARD|ENHANCED)
-
-**Chat State** (updated):
-```json
-{
-  "session_id": "uuid-session",
-  "built_dsl": "(investor.start-opportunity ...) (kyc.begin ...)",
-  "context": {
-    "investor_id": "a1b2c3d4-...",
-    "investor_name": "Acme Capital LP",
-    "investor_type": "CORPORATE",
-    "current_state": "KYC_PENDING"  ← State transition!
-  }
-}
-```
+**Database State**: Version 2 stored - complete DSL includes both operations
 
 ---
 
-**User**: "Collect their certificate of incorporation"
+**Command 3: Discover KYC requirements**
+```bash
+./dsl-poc discover-kyc --cbu="CBU-1234"
+```
 
-**System generates DSL (State Version 3)**:
+**System accumulates DSL (State Version 3)** - AI agent analyzes context and appends:
 ```lisp
-(investor.start-opportunity
-  @attr{a1b2c3d4-...}
-  @attr{e5f6a7b8-...}
-  @attr{c9d0e1f2-...}
-  @attr{a3b4c5d6-...}
+(case.create
+  (cbu.id "CBU-1234")
+  (nature-purpose "UCITS equity fund domiciled in LU")
 )
 
-(kyc.begin
-  @attr{a1b2c3d4-...}
-  @attr{f7g8h9i0-...}
-)
+(products.add "CUSTODY" "FUND_ACCOUNTING")
 
-(kyc.collect-doc
-  @attr{a1b2c3d4-...}  ; SAME investor_id
-  @attr{j1k2l3m4-...}  ; document.type = "certificate of incorporation"
-  @attr{e5f6a7b8-...}  ; document.subject = "Acme Capital LP" (reused!)
+(kyc.start
+  (documents
+    (document "CertificateOfIncorporation")
+    (document "ArticlesOfAssociation")
+  )
+  (jurisdictions
+    (jurisdiction "LU")
+  )
 )
 ```
 
 **Key observations**:
 1. **State accumulates** - each operation appends to DSL
-2. **AttributeIDs provide referential integrity** - same investor_id used across operations
-3. **AttributeIDs can be reused** - `e5f6a7b8` used for both investor name and document subject
-4. **Dictionary provides semantics** - systems know what each attribute means
-5. **Complete audit trail** - entire conversation visible in DSL
-6. **State transitions tracked** - OPPORTUNITY → KYC_PENDING
-7. **No placeholders** - all UUIDs resolved from context
+2. **Complete audit trail** - entire onboarding history visible in one document
+3. **AttributeIDs provide semantics** - `(var (attr-id "..."))` references dictionary for type information
+4. **Immutable versioning** - all three versions preserved in database
+5. **State reconstruction** - can recreate state at any point by parsing DSL
+6. **AI integration** - Gemini generates valid DSL using approved verbs only
 
-This is how **DSL-as-State + AttributeID-as-Type** enables stateful, semantic, auditable workflows!
+This is how **DSL-as-State + AttributeID-as-Type** enables auditable, compliant onboarding workflows!
 
 ---
 
@@ -566,18 +540,7 @@ make check              # Run fmt, vet, and lint (pre-commit check)
 
 GitHub Actions pipeline runs on Ubuntu with Go version from `go.mod`, caches modules and build artifacts, executes lint/build/test phases with 5-minute timeout.
 
-## Recent Enhancements
-
-### DSL Verb Validation (Completed)
-**Main Onboarding POC Agent**: Added validation to prevent AI from generating unapproved DSL verbs:
-- `internal/agent/dsl_agent.go` - Added `validateDSLVerbs()` function with 68 approved verbs
-- Validation runs after AI generation in `CallDSLTransformationAgent`
-- Returns error if unapproved verbs detected (e.g., "invalid verb: xyz.unknown")
-- System prompt explicitly lists all approved verbs from vocabulary
-- Pattern: `(verb.action` extracted via regex, validated against approved vocabulary map
-
-**Hedge Fund Module**: Already had validation in place:
-- `hedge-fund-investor-source/hf-agent/hf_dsl_agent.go` - Validates 17 hedge fund investorDeferred to Next Session)
+## Known Limitations & Future Work
 
 **DSL CRUD Operations Enhancement**: The onboarding DSL is the key artifact of this POC. Current implementation has temporary workarounds that need to be completed:
 
