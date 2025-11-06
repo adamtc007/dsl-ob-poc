@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -789,13 +788,3 @@ func ManageCredentialsCommand(args []string) error {
 	return nil
 }
 
-// Helper function to parse integer flag
-func parseInt(s string, defaultVal int) int {
-	if s == "" {
-		return defaultVal
-	}
-	if val, err := strconv.Atoi(s); err == nil {
-		return val
-	}
-	return defaultVal
-}

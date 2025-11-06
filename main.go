@@ -79,20 +79,6 @@ func run() int {
 		}
 		fmt.Println("Catalog seeded successfully with mock data.")
 
-	case "seed-product-requirements":
-		// Check for --verify flag
-		verify := false
-		for _, arg := range args {
-			if arg == "--verify" {
-				verify = true
-				break
-			}
-		}
-		err = cli.RunSeedProductRequirements(ctx, dataStore, verify)
-		if err != nil {
-			log.Printf("Failed to seed product requirements: %v", err)
-			return 1
-		}
 
 	case "create":
 		err = cli.RunCreate(ctx, dataStore, args)

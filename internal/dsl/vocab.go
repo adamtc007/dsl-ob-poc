@@ -33,21 +33,12 @@ func (CaseManagementVerbs) Create(cbuID, naturePurpose string) string {
 	return fmt.Sprintf("(case.create (cbu.id %q) (nature-purpose %q))", cbuID, naturePurpose)
 }
 
-func (CaseManagementVerbs) Update(cbuID, status string) string {
-	return fmt.Sprintf("(case.update (cbu.id %q) (status %q))", cbuID, status)
-}
 
-func (CaseManagementVerbs) Validate(requirements string) string {
-	return fmt.Sprintf("(case.validate (requirements %s))", requirements)
-}
 
 func (CaseManagementVerbs) Approve(approverID, timestamp string) string {
 	return fmt.Sprintf("(case.approve (approver.id %q) (timestamp %q))", approverID, timestamp)
 }
 
-func (CaseManagementVerbs) Close(reason, finalState string) string {
-	return fmt.Sprintf("(case.close (reason %q) (final-state %q))", reason, finalState)
-}
 
 // EntityIdentityVerbs defines entity registration and identity management
 type EntityIdentityVerbs struct{}
@@ -56,21 +47,9 @@ func (EntityIdentityVerbs) Register(entityType, jurisdiction string) string {
 	return fmt.Sprintf("(entity.register (type %q) (jurisdiction %q))", entityType, jurisdiction)
 }
 
-func (EntityIdentityVerbs) Classify(category, riskLevel string) string {
-	return fmt.Sprintf("(entity.classify (category %q) (risk-level %q))", category, riskLevel)
-}
 
-func (EntityIdentityVerbs) Link(parentID, relationship string) string {
-	return fmt.Sprintf("(entity.link (parent.id %q) (relationship %q))", parentID, relationship)
-}
 
-func (EntityIdentityVerbs) VerifyIdentity(documentID, status string) string {
-	return fmt.Sprintf("(identity.verify (document.id %q) (status %q))", documentID, status)
-}
 
-func (EntityIdentityVerbs) Attest(signatoryID, capacity string) string {
-	return fmt.Sprintf("(identity.attest (signatory.id %q) (capacity %q))", signatoryID, capacity)
-}
 
 // ProductServiceVerbs defines product and service management operations
 type ProductServiceVerbs struct{}

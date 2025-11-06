@@ -1,4 +1,4 @@
-.PHONY: build build-greenteagc clean install-deps init-db help lint fmt vet test test-coverage check validate validate-bad
+.PHONY: build build-greenteagc clean install-deps init-db help lint fmt vet deadcode test test-coverage check validate validate-bad
 
 # Default Go variables
 GO := go
@@ -23,6 +23,7 @@ help:
 	@echo "  make lint               - Run golangci-lint"
 	@echo "  make fmt                - Format code with gofmt"
 	@echo "  make vet                - Run go vet"
+	@echo "  make deadcode           - Find unreachable code with deadcode tool"
 	@echo "  make check              - Run fmt, vet, and lint (pre-commit check)"
 	@echo ""
 	@echo "Test targets:"
@@ -111,6 +112,15 @@ lint:
 		GOCACHE=$(PWD)/.gocache GOLANGCI_LINT_CACHE=$(PWD)/.gocache/golangci-lint $(GOLANGCI_LINT) run -v ./...; \
 	else \
 		echo "golangci-lint is not installed. Install it from https://golangci-lint.run/usage/install/"; \
+		exit 1; \
+	fi
+
+deadcode:
+	@echo "Finding unreachable code with deadcode..."
+	@if command -v deadcode >/dev/null 2>&1; then \
+		deadcode -test ./...; \
+	else \
+		echo "deadcode is not installed. Install it with: go install golang.org/x/tools/cmd/deadcode@latest"; \
 		exit 1; \
 	fi
 

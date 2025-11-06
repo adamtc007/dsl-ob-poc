@@ -163,66 +163,7 @@ func (cm *CredentialManager) DeleteCredentials(ctx context.Context, name string)
 	return nil
 }
 
-// UpdateCredentials updates existing credentials
-func (cm *CredentialManager) UpdateCredentials(ctx context.Context, name string, credentials map[string]interface{}) error {
-	// Serialize credentials to JSON
-	credentialsJSON, err := json.Marshal(credentials)
-	if err != nil {
-		return fmt.Errorf("failed to marshal credentials: %w", err)
-	}
 
-	// Encrypt the credentials
-	encryptedData, err := cm.encrypt(credentialsJSON)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt credentials: %w", err)
-	}
-
-	// Update in database
-	query := `
-		UPDATE credentials_vault
-		SET encrypted_data = $2, created_at = NOW()
-		WHERE credential_name = $1 AND active = true`
-
-	result, err := cm.db.ExecContext(ctx, query, name, encryptedData)
-	if err != nil {
-		return fmt.Errorf("failed to update credentials: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("credentials '%s' not found or inactive", name)
-	}
-
-	return nil
-}
-
-// SetCredentialExpiry sets an expiration time for credentials
-func (cm *CredentialManager) SetCredentialExpiry(ctx context.Context, name string, expiresAt time.Time) error {
-	query := `
-		UPDATE credentials_vault
-		SET expires_at = $2
-		WHERE credential_name = $1 AND active = true`
-
-	result, err := cm.db.ExecContext(ctx, query, name, expiresAt)
-	if err != nil {
-		return fmt.Errorf("failed to set credential expiry: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("credentials '%s' not found or inactive", name)
-	}
-
-	return nil
-}
 
 // encrypt encrypts data using AES-256-GCM
 func (cm *CredentialManager) encrypt(data []byte) ([]byte, error) {
@@ -310,21 +251,7 @@ func (cm *CredentialManager) CreateBasicAuthCredentials(ctx context.Context, nam
 	return cm.StoreCredentials(ctx, name, "basic", environment, credentials)
 }
 
-// CreateOAuth2Credentials creates OAuth2 credentials
-func (cm *CredentialManager) CreateOAuth2Credentials(ctx context.Context, name, environment, accessToken, refreshToken, clientID, clientSecret string) error {
-	credentials := map[string]interface{}{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-		"client_id":     clientID,
-		"client_secret": clientSecret,
-	}
-	return cm.StoreCredentials(ctx, name, "oauth2", environment, credentials)
-}
 
-// CreateCustomCredentials creates custom credentials with arbitrary key-value pairs
-func (cm *CredentialManager) CreateCustomCredentials(ctx context.Context, name, environment string, customData map[string]interface{}) error {
-	return cm.StoreCredentials(ctx, name, "custom", environment, customData)
-}
 
 // ==============================================================================
 // Credential Validation and Health Checks
