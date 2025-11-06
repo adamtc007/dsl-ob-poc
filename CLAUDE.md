@@ -124,6 +124,39 @@ The DSL is not just a representation of state—**the DSL IS the state itself**.
 - ✅ UUID resolution: Verified no `<investor_id>` placeholders in output
 - ✅ Both systems operational and tested
 
+### MockStore Removed from Production Code (Completed - 2025-01-06)
+**Problem**: Production code had dependency on mock/test infrastructure, creating architectural violations and testing anti-patterns.
+
+**Issues Fixed**:
+- Removed `internal/mocks` import from production `datastore/interface.go`
+- Deleted `mockAdapter` type (210+ lines of mock wrapper code)
+- Removed `MockStore` constant from datastore configuration
+- Simplified `config.GetDataStoreConfig()` to always use PostgreSQL
+- Disabled CLI tests that depended on MockStore (marked with TODO for conversion)
+
+**Architectural Benefits**:
+- ✅ Production binary no longer includes JSON unmarshaling code from mocks package
+- ✅ Clear separation between production code and test infrastructure
+- ✅ Forces all integration tests to use real PostgreSQL or proper mocking (sqlmock)
+- ✅ Eliminates hidden JSON file I/O in production paths
+- ✅ Removes deprecated mock methods that returned errors
+
+**Migration Notes**:
+- `DSL_STORE_TYPE=mock` environment variable no longer supported
+- All code paths now use PostgreSQL via `internal/store/store.go`
+- Tests requiring data should use:
+  1. `sqlmock` for unit testing SQL operations (see `internal/store/*_test.go`)
+  2. Real PostgreSQL with test fixtures for integration tests
+  3. `testcontainers` for full database integration testing
+
+**Affected Tests** (Disabled, need conversion):
+- `internal/cli/history_test.go` - TestRunHistory_PrintsHistory
+- `internal/cli/get_attribute_values_test.go` - TestGetAttributeValues_Integration
+
+**Files Modified**:
+- `internal/datastore/interface.go` - Removed mock imports and mockAdapter (saved ~220 lines)
+- `internal/config/config.go` - Simplified to PostgreSQL-only configuration
+
 ---
 
 ## 🔑 Second Core Pattern: **AttributeID-as-Type**
