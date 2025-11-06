@@ -488,6 +488,277 @@ make init-db            # Initialize schema and tables
 - Graceful fallback when API key not provided
 - Safety settings configured to avoid blocking
 
+## 🤖 AI Agent & RAG System
+
+This system uses **Retrieval-Augmented Generation (RAG)** to generate high-quality DSL from unstructured natural language inputs. The approach combines catalog/dictionary retrieval with AI-assisted generation and strict validation.
+
+### Dual RAG Architecture
+
+**Pattern 1: Catalog/Dictionary RAG** (Database Retrieval)
+- Retrieves structured data from PostgreSQL catalog tables
+- No AI involved - pure data lookup and assembly
+- Used by: `discover-services`, `discover-resources`
+
+```go
+// Example: discover-services (internal/cli/discover_services.go:54-65)
+for _, productName := range productNames {
+    product := ds.GetProductByName(ctx, productName)        // Catalog lookup
+    services := ds.GetServicesForProduct(ctx, product.ID)   // RAG: retrieve related services
+    productServicesMap[product.Name] = services
+}
+// Result: Complete product→services mapping from catalog
+```
+
+**Pattern 2: AI-Assisted RAG with Context** (LLM + Parsed DSL)
+- Parses current DSL to extract context (nature-purpose, products, etc.)
+- Feeds context to Gemini with structured system prompt
+- AI generates structured JSON response
+- System validates DSL verbs and converts to S-expressions
+- Used by: `discover-kyc` (potentially extendable to other workflows)
+
+```go
+// Example: discover-kyc (internal/cli/discover_kyc.go:51-79)
+naturePurpose := dsl.ParseNaturePurpose(currentDSL)    // Extract context from DSL
+productNames := dsl.ParseProductNames(currentDSL)       // Parse products
+existingReqs := dsl.ParseKYCRequirements(currentDSL)    // Parse current KYC state
+
+// RAG: Feed context to AI
+newReqs := ai.CallKYCAgent(ctx, naturePurpose, productNames)
+
+// Reconcile and generate DSL
+newDSL, diff := dsl.AddOrModifyKYCBlock("", existingReqs, newReqs)
+```
+
+### System Prompt Engineering
+
+**Key Insight**: The system prompts explicitly constrain the AI to use ONLY approved DSL verbs from the vocabulary. This prevents hallucination and ensures generated DSL is valid.
+
+**KYC Agent Prompt** (`internal/agent/agent.go:83-97`):
+```
+You are an expert KYC/AML Compliance Officer for a major global bank.
+
+RULES:
+1. Analyze "nature and purpose" for entity type and domicile
+2. Analyze products for regulatory impact (e.g., TRANSFER_AGENT → AML checks)
+3. Respond ONLY with JSON: {"required_documents": [...], "jurisdictions": [...]}
+4. No markdown, no conversational text, just JSON
+
+EXAMPLES:
+Input: "UCITS equity fund domiciled in LU", Products: ["CUSTODY"]
+Output: {"required_documents":["CertificateOfIncorporation","ArticlesOfAssociation","W8BEN-E"],"jurisdictions":["LU"]}
+```
+
+**DSL Transformation Agent Prompt** (`internal/agent/dsl_agent.go:49-97`):
+```
+You are an expert DSL architect for financial onboarding workflows.
+
+APPROVED DSL VERBS (MUST USE ONLY THESE):
+- case.create, case.update, case.validate, case.approve, case.close
+- entity.register, entity.classify, entity.link, identity.verify, identity.attest
+- products.add, products.configure, services.discover, services.provision
+- kyc.start, kyc.collect, kyc.verify, kyc.assess, compliance.screen
+- ubo.collect-entity-data, ubo.resolve-ubos, ubo.calculate-indirect-ownership
+- resources.plan, resources.provision, resources.configure
+- attributes.define, values.bind, values.validate, values.encrypt
+- workflow.transition, tasks.create, tasks.assign, tasks.complete
+- notify.send, audit.log, external.query, api.call
+[... 70+ approved verbs total]
+
+RULES:
+1. ONLY use verbs from the approved vocabulary listed above
+2. Analyze current DSL and understand semantic meaning
+3. Apply transformation while preserving DSL syntax
+4. Respond with JSON: {"new_dsl": "...", "explanation": "...", "changes": [...], "confidence": 0.95}
+
+DSL SYNTAX GUIDE:
+- S-expressions: (command args...)
+- Case creation: (case.create (cbu.id "ID") (nature-purpose "DESC"))
+- Products: (products.add "PRODUCT1" "PRODUCT2")
+- Resources: (resources.plan (resource.create "NAME" (owner "OWNER") (var (attr-id "UUID"))))
+```
+
+### Verb Validation (Anti-Hallucination)
+
+**Problem**: AI models can generate plausible-sounding but invalid DSL verbs (e.g., `kyc.submit`, `case.finalize`)
+
+**Solution**: Post-generation validation against approved vocabulary
+
+**Implementation** (`internal/agent/dsl_agent.go:279-416`):
+```go
+func validateDSLVerbs(dsl string) error {
+    approvedVerbs := map[string]bool{
+        "case.create": true,
+        "products.add": true,
+        "kyc.start": true,
+        // ... 70+ approved verbs
+    }
+
+    // Extract verbs using regex: \(([a-z]+\.[a-z][a-z-]*)\s
+    verbPattern := regexp.MustCompile(`\(([a-z]+\.[a-z][a-z-]*)\s`)
+    matches := verbPattern.FindAllStringSubmatch(dsl, -1)
+
+    for _, match := range matches {
+        verb := match[1]
+        if !approvedVerbs[verb] {
+            return fmt.Errorf("unapproved DSL verb: %s", verb)
+        }
+    }
+    return nil
+}
+```
+
+**Why This Works**:
+- System prompt lists approved verbs → AI knows constraints
+- Post-generation validation catches any violations
+- Hard failure prevents invalid DSL from entering the system
+- Maintains domain vocabulary integrity
+
+### Context Extraction & Reconciliation
+
+The system maintains **DSL-as-State** by parsing the current DSL to extract context before AI generation.
+
+**Context Extraction** (from accumulated DSL):
+```go
+// Parse existing state from DSL
+naturePurpose := dsl.ParseNaturePurpose(currentDSL)      // "UCITS fund domiciled in LU"
+productNames := dsl.ParseProductNames(currentDSL)         // ["CUSTODY", "FUND_ACCOUNTING"]
+existingKYC := dsl.ParseKYCRequirements(currentDSL)       // Current KYC docs/jurisdictions
+```
+
+**Reconciliation** (diff & merge):
+```go
+// AI generates new desired state
+newReqs := ai.CallKYCAgent(ctx, naturePurpose, productNames)
+
+// Calculate diff (idempotent reconciliation)
+newDSL, diff := dsl.AddOrModifyKYCBlock("", existingKYC, newReqs)
+
+if !diff.HasChanges() {
+    log.Println("✅ KYC requirements already up-to-date")
+    return nil  // Idempotent - no-op if no changes
+}
+
+// Log changes
+log.Printf("KYC Diff: +Docs[%s] -Docs[%s] +Juris[%s] -Juris[%s]",
+    diff.AddedDocs, diff.RemovedDocs, diff.AddedJuris, diff.RemovedJuris)
+```
+
+### JSON Response Handling
+
+**Challenge**: Gemini sometimes wraps JSON in markdown code blocks
+
+**Solution**: Robust JSON cleaning (`internal/agent/dsl_agent.go:235-277`):
+```go
+func cleanJSONResponse(response string) string {
+    cleaned := strings.TrimSpace(response)
+
+    // Remove markdown wrappers: ```json ... ```
+    if strings.HasPrefix(cleaned, "```json") {
+        cleaned = cleaned[strings.Index(cleaned, "\n")+1:]
+    }
+    cleaned = strings.TrimSuffix(cleaned, "```")
+
+    // Validate JSON
+    if err := json.Unmarshal([]byte(cleaned), new(interface{})); err == nil {
+        return cleaned
+    }
+
+    // Extract JSON object: first { to last }
+    firstBrace := strings.Index(cleaned, "{")
+    lastBrace := strings.LastIndex(cleaned, "}")
+    if firstBrace != -1 && lastBrace != -1 {
+        extracted := cleaned[firstBrace:lastBrace+1]
+        if json.Valid([]byte(extracted)) {
+            return extracted
+        }
+    }
+
+    return response  // Return original if can't clean
+}
+```
+
+### Complete Workflow: discover-kyc
+
+**Step-by-step RAG + AI generation**:
+
+1. **Parse Current State** (RAG context extraction)
+   ```go
+   naturePurpose := dsl.ParseNaturePurpose(currentDSL)
+   productNames := dsl.ParseProductNames(currentDSL)
+   existingKYC := dsl.ParseKYCRequirements(currentDSL)
+   ```
+
+2. **Call AI Agent** (with structured prompt + context)
+   ```go
+   newReqs := ai.CallKYCAgent(ctx, naturePurpose, productNames)
+   // AI generates: {"required_documents": [...], "jurisdictions": [...]}
+   ```
+
+3. **Validate Response** (JSON parsing + verb validation)
+   ```go
+   cleanedJSON := cleanJSONResponse(aiResponse)
+   json.Unmarshal(cleanedJSON, &kycResp)
+   ```
+
+4. **Reconcile State** (diff existing vs new)
+   ```go
+   newDSL, diff := dsl.AddOrModifyKYCBlock("", existingKYC, newReqs)
+   if !diff.HasChanges() { return nil }  // Idempotent
+   ```
+
+5. **Accumulate DSL** (via session manager)
+   ```go
+   dslSession.AccumulateDSL(currentDSL)
+   dslSession.AccumulateDSL(newDSL)
+   finalDSL := dslSession.GetDSL()
+   ```
+
+6. **Persist to Database** (new version + state transition)
+   ```go
+   versionID := ds.InsertDSLWithState(ctx, cbuID, finalDSL, StateKYCDiscovered)
+   ds.UpdateOnboardingState(ctx, cbuID, StateKYCDiscovered, versionID)
+   ```
+
+### Testing & Verification
+
+**Test Coverage** (`internal/agent/dsl_agent_test.go`):
+- ✅ 20+ test cases covering all 70+ approved verbs
+- ✅ Verb validation with positive/negative cases
+- ✅ JSON parsing with markdown-wrapped responses
+- ✅ DSL transformation with various input scenarios
+
+**Mock Responses** (`internal/agent/mock_responses.go`):
+- Fallback JSON responses when Gemini API unavailable
+- Enables testing without API key
+- Ensures CI/CD pipeline runs successfully
+
+### Key Benefits
+
+1. **Structured Generation**: System prompts ensure AI outputs valid JSON/DSL
+2. **Vocabulary Constraints**: Only approved verbs allowed → no hallucination
+3. **Context-Aware**: AI receives parsed DSL context for intelligent generation
+4. **Reconciliation**: Diff-based approach makes commands idempotent
+5. **Validation Pipeline**: Multiple layers (prompt → generation → validation → parsing)
+6. **Graceful Degradation**: Works without API key (mock responses)
+
+### Extensibility
+
+**To add new AI-assisted workflows**:
+
+1. Define system prompt with approved verbs
+2. Extract context from current DSL
+3. Call Gemini with structured prompt
+4. Validate generated verbs
+5. Parse JSON response
+6. Reconcile with existing state
+7. Accumulate DSL via session manager
+
+**Example domains ready for AI assistance**:
+- UBO discovery (already has verb vocabulary)
+- Service configuration (needs prompt engineering)
+- Resource provisioning (needs decision logic)
+- Compliance screening (needs regulatory rules)
+
 ## DSL Format
 
 S-expressions with nested structure representing onboarding progression:
