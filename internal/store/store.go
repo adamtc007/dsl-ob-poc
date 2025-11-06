@@ -1589,6 +1589,40 @@ func (s *Store) GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.At
 	return attributes, nil
 }
 
+// GetAllAttributes is an alias for GetAllDictionaryAttributes (for consistency with interface)
+func (s *Store) GetAllAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	return s.GetAllDictionaryAttributes(ctx)
+}
+
+// UpdateAttributeVector updates the vector embedding for a dictionary attribute
+func (s *Store) UpdateAttributeVector(ctx context.Context, attributeID string, vector []float64) error {
+	// Convert float64 slice to JSON array string
+	vectorJSON, err := json.Marshal(vector)
+	if err != nil {
+		return fmt.Errorf("failed to marshal vector to JSON: %w", err)
+	}
+
+	query := `UPDATE "dsl-ob-poc".dictionary
+	          SET vector = $1, updated_at = NOW()
+	          WHERE attribute_id = $2::uuid`
+
+	result, err := s.db.ExecContext(ctx, query, string(vectorJSON), attributeID)
+	if err != nil {
+		return fmt.Errorf("failed to update attribute vector: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no attribute found with ID: %s", attributeID)
+	}
+
+	return nil
+}
+
 // GetAllDSLRecords retrieves all DSL records with state information
 func (s *Store) GetAllDSLRecords(ctx context.Context) ([]DSLVersionWithState, error) {
 	query := `SELECT d.version_id::text, d.cbu_id, d.dsl_text,

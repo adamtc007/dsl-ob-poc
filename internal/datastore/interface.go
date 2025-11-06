@@ -45,6 +45,8 @@ type DataStore interface {
 	GetDictionaryAttributeByName(ctx context.Context, name string) (*dictionary.Attribute, error)
 	GetDictionaryAttributeByID(ctx context.Context, id string) (*dictionary.Attribute, error)
 	GetAttributesForDictionaryGroup(ctx context.Context, groupID string) ([]dictionary.Attribute, error)
+	GetAllAttributes(ctx context.Context) ([]dictionary.Attribute, error)
+	UpdateAttributeVector(ctx context.Context, attributeID string, vector []float64) error
 
 	// DSL Operations
 	GetLatestDSL(ctx context.Context, cbuID string) (string, error)
@@ -357,6 +359,14 @@ func (p *postgresAdapter) GetAllDictionaryAttributes(ctx context.Context) ([]dic
 	return p.store.GetAllDictionaryAttributes(ctx)
 }
 
+func (p *postgresAdapter) GetAllAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	return p.store.GetAllAttributes(ctx)
+}
+
+func (p *postgresAdapter) UpdateAttributeVector(ctx context.Context, attributeID string, vector []float64) error {
+	return p.store.UpdateAttributeVector(ctx, attributeID, vector)
+}
+
 func (p *postgresAdapter) GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error) {
 	return p.store.GetAllDSLRecords(ctx)
 }
@@ -543,6 +553,14 @@ func (m *mockAdapter) GetAllServices(ctx context.Context) ([]store.Service, erro
 
 func (m *mockAdapter) GetAllDictionaryAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
 	return m.store.GetAllDictionaryAttributes(ctx)
+}
+
+func (m *mockAdapter) GetAllAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	return m.store.GetAllAttributes(ctx)
+}
+
+func (m *mockAdapter) UpdateAttributeVector(ctx context.Context, attributeID string, vector []float64) error {
+	return m.store.UpdateAttributeVector(ctx, attributeID, vector)
 }
 
 func (m *mockAdapter) GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error) {

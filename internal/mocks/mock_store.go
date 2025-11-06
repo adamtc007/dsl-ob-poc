@@ -822,6 +822,40 @@ func (m *MockStore) GetAllDictionaryAttributes(ctx context.Context) ([]dictionar
 	return attributes, nil
 }
 
+// GetAllAttributes is an alias for GetAllDictionaryAttributes
+func (m *MockStore) GetAllAttributes(ctx context.Context) ([]dictionary.Attribute, error) {
+	return m.GetAllDictionaryAttributes(ctx)
+}
+
+// UpdateAttributeVector updates the vector embedding for a dictionary attribute in mock data
+func (m *MockStore) UpdateAttributeVector(ctx context.Context, attributeID string, vector []float64) error {
+	if err := m.loadData(); err != nil {
+		return err
+	}
+
+	// Convert vector to JSON string
+	vectorJSON, err := json.Marshal(vector)
+	if err != nil {
+		return fmt.Errorf("failed to marshal vector: %w", err)
+	}
+
+	// Find and update the attribute
+	found := false
+	for i, attr := range m.dictionary {
+		if attr.AttributeID == attributeID {
+			m.dictionary[i].Vector = string(vectorJSON)
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("attribute not found: %s", attributeID)
+	}
+
+	return nil
+}
+
 // GetAllDSLRecords returns all DSL records with state information from mock data
 func (m *MockStore) GetAllDSLRecords(ctx context.Context) ([]store.DSLVersionWithState, error) {
 	if err := m.loadData(); err != nil {

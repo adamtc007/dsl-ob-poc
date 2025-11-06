@@ -185,6 +185,13 @@ func run() int {
 	case "history":
 		err = cli.RunHistory(ctx, dataStore, args)
 
+	// VECTOR EMBEDDING AND SEMANTIC SEARCH COMMANDS
+	case "generate-embeddings":
+		err = cli.RunGenerateEmbeddings(ctx, dataStore, args)
+
+	case "semantic-search":
+		err = cli.RunSemanticSearch(ctx, dataStore, args)
+
 	// MULTI-DOMAIN ORCHESTRATION COMMANDS
 	case "orchestration-init-db":
 		err = cli.RunOrchestrationInitDB(ctx, dataStore, args)
@@ -287,6 +294,12 @@ func printUsage() {
 	fmt.Println("  discover-resources --cbu=<cbu-id> (v6) Discovers and appends resources plan.")
 	fmt.Println("  populate-attributes --cbu=<cbu-id> (v7) Populates attribute values from runtime sources.")
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v8) Resolves and binds attribute values deterministically.")
+
+	fmt.Println("\nVector Embeddings & Semantic Search Commands (requires OPENAI_API_KEY):")
+	fmt.Println("  generate-embeddings [--model=<model>] [--domain=<domain>] [--dry-run]")
+	fmt.Println("                      Generate vector embeddings for dictionary attributes")
+	fmt.Println("  semantic-search --query=<natural-language-query> [--top=<N>] [--domain=<domain>] [--group=<group>]")
+	fmt.Println("                  Search attributes using natural language (e.g., \"What tracks wealth?\")")
 
 	fmt.Println("\nDSL Lifecycle Management Commands:")
 
