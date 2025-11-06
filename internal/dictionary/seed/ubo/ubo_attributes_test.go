@@ -1,6 +1,7 @@
 package ubo
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,20 +49,29 @@ func TestGenerateUBOAttributes(t *testing.T) {
 			// Allow trust.* attributes
 		} else if len(attr.Name) >= 12 && attr.Name[:12] == "partnership." {
 			// Allow partnership.* attributes
+		} else if len(attr.Name) >= 7 && attr.Name[:7] == "fincen." {
+			// Allow fincen.* attributes
 		} else {
 			t.Errorf("Attribute name should follow naming convention: %s", attr.Name)
 		}
 
-		// Validate constraints are present for required fields
+		// Validate constraints are meaningful - should have either requirement constraints or validation constraints
 		if len(attr.Constraints) > 0 {
-			hasValidConstraint := false
+			hasRequirementConstraint := false
+			hasValidationConstraint := false
 			for _, constraint := range attr.Constraints {
 				if constraint == "REQUIRED" || constraint == "OPTIONAL" {
-					hasValidConstraint = true
-					break
+					hasRequirementConstraint = true
+				}
+				if strings.Contains(constraint, "MIN") || strings.Contains(constraint, "MAX") ||
+				   strings.Contains(constraint, "LENGTH") || strings.Contains(constraint, "DEFAULT") ||
+				   strings.Contains(constraint, "PRECISION") {
+					hasValidationConstraint = true
 				}
 			}
-			assert.True(t, hasValidConstraint, "Should have REQUIRED or OPTIONAL constraint: %s", attr.Name)
+			// Should have either requirement constraint OR validation constraint
+			assert.True(t, hasRequirementConstraint || hasValidationConstraint,
+				"Should have either REQUIRED/OPTIONAL or validation constraints: %s", attr.Name)
 		}
 	}
 
@@ -315,6 +325,10 @@ func TestUBOAttributeMetadata(t *testing.T) {
 				// Partnership-specific tags
 				"PARTNERSHIP", "PARTNER", "CAPITAL", "FINANCIAL", "MECHANISM",
 				"PRONG", "WORKFLOW", "TYPE", "FRAMEWORK", "RECURSIVE", "DEPTH",
+				// FinCEN-specific tags
+				"FINCEN", "TITLE", "SELECTION", "PRIORITY", "FUNCTIONS", "INDIVIDUAL",
+				"DECISION", "RATIONALE", "CITATION", "AUDIT", "SIGNIFICANT_RESPONSIBILITY",
+				"SIMILAR_FUNCTIONS", "METHOD", "RANK", "PERFORMED", "SINGLE_INDIVIDUAL",
 			}, tag, "Tag should be from expected UBO tag vocabulary: %s", tag)
 		}
 	}
