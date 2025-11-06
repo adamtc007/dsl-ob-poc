@@ -231,6 +231,9 @@ func run() int {
 	case "dsl-execute":
 		err = cli.RunDSLExecute(ctx, dataStore, args)
 
+	case "validate-dsl":
+		err = cli.RunValidateDSL(ctx, dataStore, args)
+
 	// PHASE 6 COMPILE-TIME OPTIMIZATION
 	case "optimize":
 		err = cli.RunOptimize(ctx, dataStore, args)
@@ -241,6 +244,34 @@ func run() int {
 
 	case "test-db-vocabulary":
 		err = cli.RunTestDBVocabulary(ctx, args)
+
+	// Vector and semantic search commands
+	case "regenerate-vectors":
+		err = cli.RegenerateVectorsCommand(args)
+	case "search-attributes":
+		err = cli.SearchAttributesCommand(args)
+
+	// Grammar and EBNF commands
+	case "init-grammar":
+		err = cli.InitializeGrammarCommand(ctx, dataStore, args)
+	case "validate-grammar":
+		err = cli.ValidateGrammarCommand(ctx, dataStore, args)
+
+	// RUNTIME API ENDPOINTS COMMANDS
+	case "list-resource-types":
+		err = cli.ListResourceTypesCommand(args)
+	case "list-actions":
+		err = cli.ListActionsCommand(args)
+	case "execute-action":
+		err = cli.ExecuteActionCommand(args)
+	case "list-executions":
+		err = cli.ListExecutionsCommand(args)
+	case "trigger-workflow":
+		err = cli.TriggerWorkflowCommand(args)
+	case "create-action":
+		err = cli.CreateActionCommand(args)
+	case "manage-credentials":
+		err = cli.ManageCredentialsCommand(args)
 
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
@@ -289,6 +320,7 @@ func printUsage() {
 	fmt.Println("  get-attribute-values --cbu=<cbu-id> (v8) Resolves and binds attribute values deterministically.")
 
 	fmt.Println("\nDSL Lifecycle Management Commands:")
+	fmt.Println("  validate-dsl <file_path>     Validates a DSL file.")
 
 	fmt.Println("\nAI Agent Commands (requires GEMINI_API_KEY):")
 	fmt.Println("  agent-transform --cbu=<cbu-id>   AI-powered DSL transformation with natural language instructions")
@@ -342,9 +374,42 @@ func printUsage() {
 	fmt.Println("                     --dry-run: Show what would be migrated without making changes")
 	fmt.Println("  test-db-vocabulary [--domain=<domain>] [--verb=<verb>] [--dsl=<dsl>]")
 	fmt.Println("                     Test database-backed vocabulary validation (Phase 4 verification)")
+
+	fmt.Println("\nVector Database Commands:")
+	fmt.Println("  regenerate-vectors [--attribute-id=<id>] [--validate] [--stats]")
+	fmt.Println("                     Regenerate semantic vectors for dictionary attributes")
+	fmt.Println("  search-attributes --query=<text> [--limit=<n>]")
+	fmt.Println("                     Search for similar attributes using semantic vectors")
+
+	fmt.Println("\nGrammar and EBNF Commands:")
+	fmt.Println("  init-grammar [--force]")
+	fmt.Println("                     Initialize EBNF grammar system with default rules")
+	fmt.Println("  validate-grammar --file=<dsl_file> [--domain=<domain>] [--verbose]")
+	fmt.Println("                     Validate DSL using EBNF grammar rules")
+	fmt.Println("  validate-grammar --dsl=<dsl_text> [--domain=<domain>] [--verbose]")
+	fmt.Println("                     Validate DSL text using EBNF grammar rules")
+
 	fmt.Println("\nPhase 6 Compile-Time Optimization:")
 	fmt.Println("  optimize --cbu=<cbu-id> [--output=<file>] [--format=json|yaml|text] [--strategy=BALANCED|COST_OPTIMIZED|PERFORMANCE_OPTIMIZED]")
 	fmt.Println("           [--max-cost=<amount>] [--session-id=<id>] [--save-results] [--verbose]")
 	fmt.Println("                     Perform compile-time optimization and execution planning for DSL documents")
 	fmt.Println("                     Includes dependency analysis, resource optimization, and execution planning")
+
+	fmt.Println("\nRuntime API Endpoints & Execution:")
+	fmt.Println("  list-resource-types [--environment=<env>] [--active-only] [--verbose]")
+	fmt.Println("                     List available resource types for runtime execution")
+	fmt.Println("  list-actions --verb=<pattern> [--environment=<env>] [--verbose]")
+	fmt.Println("                     List action definitions for specific verb patterns")
+	fmt.Println("  execute-action --action-id=<id> --cbu-id=<cbu> [--dsl-version-id=<id>] [--environment=<env>] [--async] [--verbose]")
+	fmt.Println("                     Manually execute a specific action definition")
+	fmt.Println("  list-executions --cbu-id=<cbu> [--limit=<n>] [--status=<status>] [--verbose] [--show-payload]")
+	fmt.Println("                     List action execution history and results")
+	fmt.Println("  trigger-workflow --cbu-id=<cbu> [--environment=<env>] [--dry-run] [--verbose]")
+	fmt.Println("                     Trigger actions based on current DSL state")
+	fmt.Println("  create-action --name=<name> --verb=<pattern> --endpoint=<url> [--type=<type>] [--method=<method>] [--timeout=<sec>]")
+	fmt.Println("                     [--resource-type=<type>] [--environment=<env>] [--config-file=<file>]")
+	fmt.Println("                     Create new action definition for runtime execution")
+	fmt.Println("  manage-credentials --action=<list|create|delete|test> [--name=<name>] [--type=<type>] [--environment=<env>]")
+	fmt.Println("                     [--api-key=<key>] [--token=<token>] [--username=<user>] [--password=<pass>] [--verbose]")
+	fmt.Println("                     Manage encrypted credentials for API authentication")
 }

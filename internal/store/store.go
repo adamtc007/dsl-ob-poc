@@ -23,7 +23,7 @@ type Store struct {
 
 // CBU represents a Client Business Unit in the catalog.
 type CBU struct {
-	CBUID         string `json:"cbu_id"`
+	CBUID         string `json:"cbu_id"` // UUID string - references database UUID primary key
 	Name          string `json:"name"`
 	Description   string `json:"description"`
 	NaturePurpose string `json:"nature_purpose"`
@@ -47,12 +47,12 @@ type Service struct {
 type ProductRequirements struct {
 	ProductID        string                   `json:"product_id"`
 	ProductName      string                   `json:"product_name"`
-	EntityTypes      []string                 `json:"entity_types"`
-	RequiredDSL      []string                 `json:"required_dsl"`
-	Attributes       []string                 `json:"attributes"`
-	Compliance       []ProductComplianceRule  `json:"compliance"`
-	Prerequisites    []string                 `json:"prerequisites"`
-	ConditionalRules []ProductConditionalRule `json:"conditional_rules"`
+	EntityTypes      JSONBStringArray         `json:"entity_types"`      // JSONB array
+	RequiredDSL      JSONBStringArray         `json:"required_dsl"`      // JSONB array
+	Attributes       JSONBStringArray         `json:"attributes"`        // JSONB array
+	Compliance       []ProductComplianceRule  `json:"compliance"`        // Will be marshaled as JSONB
+	Prerequisites    JSONBStringArray         `json:"prerequisites"`     // JSONB array
+	ConditionalRules []ProductConditionalRule `json:"conditional_rules"` // Will be marshaled as JSONB
 	CreatedAt        time.Time                `json:"created_at"`
 	UpdatedAt        time.Time                `json:"updated_at"`
 }
@@ -71,12 +71,12 @@ type ProductConditionalRule struct {
 }
 
 type EntityProductMapping struct {
-	EntityType     string    `json:"entity_type"`
-	ProductID      string    `json:"product_id"`
-	Compatible     bool      `json:"compatible"`
-	Restrictions   []string  `json:"restrictions"`
-	RequiredFields []string  `json:"required_fields"`
-	CreatedAt      time.Time `json:"created_at"`
+	EntityType     string           `json:"entity_type"`
+	ProductID      string           `json:"product_id"`
+	Compatible     bool             `json:"compatible"`
+	Restrictions   JSONBStringArray `json:"restrictions"`    // JSONB array
+	RequiredFields JSONBStringArray `json:"required_fields"` // JSONB array
+	CreatedAt      time.Time        `json:"created_at"`
 }
 
 // ProdResource represents a resource required by products/services.
@@ -90,15 +90,15 @@ type ProdResource struct {
 
 // Attribute represents an attribute in the dictionary (v3 schema).
 type Attribute struct {
-	AttributeID     string `json:"attribute_id"`
-	Name            string `json:"name"`
-	LongDescription string `json:"long_description"`
-	GroupID         string `json:"group_id"`
-	Mask            string `json:"mask"`
-	Domain          string `json:"domain"`
-	Vector          string `json:"vector"`
-	Source          string `json:"source"` // JSON string
-	Sink            string `json:"sink"`   // JSON string
+	AttributeID     string             `json:"attribute_id"`
+	Name            string             `json:"name"`
+	LongDescription string             `json:"long_description"`
+	GroupID         string             `json:"group_id"`
+	Mask            string             `json:"mask"`
+	Domain          string             `json:"domain"`
+	Vector          string             `json:"vector"`
+	Source          JSONBSourceMetadata `json:"source"` // Structured JSONB
+	Sink            JSONBSinkMetadata   `json:"sink"`   // Structured JSONB
 }
 
 // Role represents a role that entities can play within a CBU.
@@ -194,6 +194,11 @@ func (s *Store) Close() error {
 		return s.db.Close()
 	}
 	return nil
+}
+
+// DB returns the underlying database connection.
+func (s *Store) DB() *sql.DB {
+	return s.db
 }
 
 // InitDB initializes the database schema from the SQL file.

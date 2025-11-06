@@ -299,9 +299,10 @@ func TestAddDiscoveredResourcesMultiple(t *testing.T) {
 // --- Tests for State 6: Populate Attributes ---
 
 func TestVarByAttrID(t *testing.T) {
+	name := "test_var"
 	id := "123e4567-e89b-12d3-a456-426614174000"
-	result := VarByAttrID(id)
-	expected := `(var (attr-id "123e4567-e89b-12d3-a456-426614174000"))`
+	result := VarByAttrID(name, id)
+	expected := `(var (name "test_var") (id "123e4567-e89b-12d3-a456-426614174000"))`
 
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
@@ -339,15 +340,21 @@ func TestNormalizeVars(t *testing.T) {
   (VAR_unknown)
 )`
 
-	// Mock resolver that maps attribute names to UUIDs
-	resolver := func(sym string) (string, bool) {
+	// Mock resolver that maps attribute names to dictionary attributes
+	resolver := func(sym string) (attr *dictionary.Attribute, ok bool) {
 		switch sym {
 		case "onboard.cbu_id":
-			return "123e4567-e89b-12d3-a456-426614174000", true
+			return &dictionary.Attribute{
+				AttributeID: "123e4567-e89b-12d3-a456-426614174000",
+				Name:        "onboard.cbu_id",
+			}, true
 		case "entity.legal_name":
-			return "987fcdeb-51a2-43f7-8765-ba9876543210", true
+			return &dictionary.Attribute{
+				AttributeID: "987fcdeb-51a2-43f7-8765-ba9876543210",
+				Name:        "entity.legal_name",
+			}, true
 		default:
-			return "", false
+			return nil, false
 		}
 	}
 

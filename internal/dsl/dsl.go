@@ -356,8 +356,8 @@ func AddDiscoveredResources(currentDSL string, plan ResourceDiscoveryPlan) (stri
 
 		attributes := plan.ResourceAttributes[resource.DictionaryGroup]
 		for i := range attributes {
-			// Use structured variable references: (var (attr-id "uuid"))
-			b.WriteString(fmt.Sprintf("    (var (attr-id %q))\n", attributes[i].AttributeID))
+			// Use simple variable references: (var (attr-id "uuid"))
+			b.WriteString(fmt.Sprintf("    %s\n", VarByAttrIDSimple(attributes[i].AttributeID)))
 		}
 		b.WriteString("  )\n")
 	}
@@ -385,19 +385,24 @@ func RenderBindings(assign map[string]string) string {
 // --- State 6: Populate Attributes ---
 
 // VarByAttrID creates canonical variable form
-func VarByAttrID(id string) string {
-	return fmt.Sprintf("(var (attr-id %q))", id)
+func VarByAttrID(name, id string) string {
+	return fmt.Sprintf(`(var (name %q) (id %q))`, name, id)
+}
+
+// VarByAttrIDSimple generates a simple variable reference with just the attribute ID
+func VarByAttrIDSimple(id string) string {
+	return fmt.Sprintf(`(var (attr-id %q))`, id)
 }
 
 // Accept (VAR_<code>) or (VAR_<uuid>) and normalize to canonical form.
 // This is a lightweight regex now; Rust/nom will do the real job later.
 var reVarSym = regexp.MustCompile(`\(VAR_([A-Za-z0-9\._\-]+)\)`)
 
-func NormalizeVars(dsl string, resolve func(sym string) (attrID string, ok bool)) string {
+func NormalizeVars(dsl string, resolve func(sym string) (attr *dictionary.Attribute, ok bool)) string {
 	return reVarSym.ReplaceAllStringFunc(dsl, func(m string) string {
 		sym := reVarSym.FindStringSubmatch(m)[1] // code or uuid
-		if id, ok := resolve(sym); ok {
-			return VarByAttrID(id)
+		if attr, ok := resolve(sym); ok {
+			return VarByAttrIDSimple(attr.AttributeID)
 		}
 		// leave unknown symbols untouched (keeps idempotence)
 		return m
@@ -405,21 +410,50 @@ func NormalizeVars(dsl string, resolve func(sym string) (attrID string, ok bool)
 }
 
 // Extract all canonical (var (attr-id "...")) occurrences
-var reVarCanon = regexp.MustCompile(`\(\s*var\s*\(\s*attr-id\s*"([^"]+)"\s*\)\s*\)`)
+var reVarAttrID = regexp.MustCompile(`\(\s*var\s*\(\s*attr-id\s*"([^"]+)"\s*\)\s*\)`)
 
 func ExtractVarAttrIDs(dsl string) []string {
-	out := []string{}
-	for _, m := range reVarCanon.FindAllStringSubmatch(dsl, -1) {
-		out = append(out, m[1])
-	}
-	return out
+    out := []string{}
+    for _, m := range reVarAttrID.FindAllStringSubmatch(dsl, -1) {
+        out = append(out, m[1]) // m[1] is the UUID
+    }
+    return out
+}
+
+// Also capture standalone (attr-id "<uuid>") tokens anywhere in the DSL
+var reAttrIDToken = regexp.MustCompile(`\(\s*attr-id\s*"([^"]+)"\s*\)`)
+
+// ExtractAttributeIDs returns unique attribute IDs referenced via either canonical var
+// or standalone (attr-id ...) tokens.
+func ExtractAttributeIDs(dsl string) []string {
+    seen := make(map[string]bool)
+    ids := []string{}
+
+    for _, id := range ExtractVarAttrIDs(dsl) {
+        if !seen[id] {
+            seen[id] = true
+            ids = append(ids, id)
+        }
+    }
+
+    for _, m := range reAttrIDToken.FindAllStringSubmatch(dsl, -1) {
+        if len(m) >= 2 {
+            id := m[1]
+            if !seen[id] {
+                seen[id] = true
+                ids = append(ids, id)
+            }
+        }
+    }
+
+    return ids
 }
 
 // AttributeReference represents an attribute variable found in DSL
 type AttributeReference struct {
 	Name         string // e.g., "onboard.cbu_id"
 	AttributeID  string // UUID from dictionary table
-	VariableForm string // e.g., "(VAR_onboard.cbu_id)" or "(VAR_8a5d1a77_...)"
+	VariableForm string // e.g., "(var (name \"onboard.cbu_id\") (id \"uuid\"))"
 }
 
 // AttributeValue represents a populated attribute value
@@ -430,17 +464,20 @@ type AttributeValue struct {
 	SourceInfo  map[string]interface{}
 }
 
-// ParseAttributeReferences finds all (var (attr-id "uuid")) references in DSL
+// ParseAttributeReferences finds all (var (name "...") (id "...")) references in DSL
 func ParseAttributeReferences(dsl string) ([]AttributeReference, error) {
-	// Use the canonical extractor
-	attrIDs := ExtractVarAttrIDs(dsl)
-
 	var refs []AttributeReference
-	for _, attrID := range attrIDs {
-		refs = append(refs, AttributeReference{
-			AttributeID:  attrID,
-			VariableForm: VarByAttrID(attrID),
-		})
+	matches := reVarAttrID.FindAllStringSubmatch(dsl, -1)
+
+	for _, match := range matches {
+		if len(match) == 2 {
+			id := match[1]
+			refs = append(refs, AttributeReference{
+				Name:         "", // Empty for simple attr-id format
+				AttributeID:  id,
+				VariableForm: VarByAttrIDSimple(id),
+			})
+		}
 	}
 
 	return refs, nil

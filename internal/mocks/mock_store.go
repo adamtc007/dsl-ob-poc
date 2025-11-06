@@ -796,16 +796,9 @@ func (m *MockStore) GetAllDictionaryAttributes(ctx context.Context) ([]dictionar
 
 	var attributes []dictionary.Attribute
 	for _, attr := range m.dictionary {
-		// Parse source and sink metadata from JSON strings
-		var sourceMetadata dictionary.SourceMetadata
-		var sinkMetadata dictionary.SinkMetadata
-
-		if attr.Source != "" {
-			_ = json.Unmarshal([]byte(attr.Source), &sourceMetadata)
-		}
-		if attr.Sink != "" {
-			_ = json.Unmarshal([]byte(attr.Sink), &sinkMetadata)
-		}
+		// Extract source and sink metadata from JSONB wrapper types
+		sourceMetadata := attr.Source.SourceMetadata
+		sinkMetadata := attr.Sink.SinkMetadata
 
 		attributes = append(attributes, dictionary.Attribute{
 			AttributeID:     attr.AttributeID,

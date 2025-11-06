@@ -8,6 +8,7 @@ import (
 	"regexp"
 
 	"dsl-ob-poc/internal/datastore"
+	"dsl-ob-poc/internal/dictionary"
 	"dsl-ob-poc/internal/dsl"
 	"dsl-ob-poc/internal/shared-dsl/session"
 )
@@ -43,16 +44,19 @@ func RunGetAttributeValues(ctx context.Context, ds datastore.DataStore, args []s
 	version := 1
 
 	// 2) Normalize any shorthand vars (needs a resolver using the dictionary)
-	norm := dsl.NormalizeVars(latest, func(sym string) (string, bool) {
+	norm := dsl.NormalizeVars(latest, func(sym string) (attr *dictionary.Attribute, ok bool) {
 		a, _ := ds.GetDictionaryAttributeByName(ctx, sym)
 		if a != nil {
-			return a.AttributeID, true
+			return a, true
 		}
-		// accept raw UUIDs in symbol too
+		// accept raw UUIDs in symbol too - create a minimal attribute for UUIDs
 		if looksLikeUUID(sym) {
-			return sym, true
+			return &dictionary.Attribute{
+				AttributeID: sym,
+				Name:        sym, // Use UUID as name for raw UUIDs
+			}, true
 		}
-		return "", false
+		return nil, false
 	})
 
 	// 3) Extract canonical var attr-ids
