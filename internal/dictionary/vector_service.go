@@ -205,24 +205,21 @@ func (v *VectorService) ValidateVectorIntegrity(ctx context.Context, repo Dictio
 // GetVectorStats returns statistics about the vector database
 func (v *VectorService) GetVectorStats(ctx context.Context, repo DictionaryRepository) (*VectorStats, error) {
 	return &VectorStats{
-		TotalAttributes:      0, // Would be populated from database
-		AttributesWithVector: 0,
+		TotalAttributes:         0, // Would be populated from database
+		AttributesWithVector:    0,
 		AttributesWithoutVector: 0,
-		LastUpdate:          nil,
+		LastUpdate:              nil,
 	}, nil
 }
 
 // VectorStats provides statistics about vector coverage
 type VectorStats struct {
-	TotalAttributes         int    `json:"total_attributes"`
-	AttributesWithVector    int    `json:"attributes_with_vector"`
-	AttributesWithoutVector int    `json:"attributes_without_vector"`
-	LastUpdate             *string `json:"last_update,omitempty"`
+	TotalAttributes         int     `json:"total_attributes"`
+	AttributesWithVector    int     `json:"attributes_with_vector"`
+	AttributesWithoutVector int     `json:"attributes_without_vector"`
+	LastUpdate              *string `json:"last_update,omitempty"`
 }
 
 // ==============================================================================
 // CLI Integration Functions - These would be called from CLI commands
 // ==============================================================================
-
-
-

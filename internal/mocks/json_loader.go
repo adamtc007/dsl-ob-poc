@@ -133,7 +133,7 @@ func (j *JSONDataLoader) LoadPartnerships() ([]store.Partnership, error) {
 // LoadIndividuals loads individual mock data from JSON
 func (j *JSONDataLoader) LoadIndividuals() ([]store.Individual, error) {
 	var individuals []store.Individual
-	if err := j.loadJSONFile("entity_individuals.json", &individuals, false); err != nil {
+	if err := j.loadJSONFile("entity_proper_persons.json", &individuals, false); err != nil {
 		return nil, err
 	}
 	return individuals, nil

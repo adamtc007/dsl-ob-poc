@@ -13,7 +13,7 @@ func ExampleUsage() {
 	// Investor Domain Example
 	investorParams := map[string]interface{}{
 		"name": "Alice Johnson",
-		"type": "INDIVIDUAL",
+		"type": "PROPER_PERSON",
 	}
 
 	investorCreatedDSL, err := templateGenerator.GenerateDSL("investor", "CREATED", investorParams)

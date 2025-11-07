@@ -45,7 +45,7 @@ func TestGenerateKYCAttributes(t *testing.T) {
 			// Optional: More specific checks for individual attributes
 			switch attr.Name {
 			case "investor.type":
-				assert.Contains(t, attr.Constraints, "ENUM:INDIVIDUAL,CORPORATE,INSTITUTIONAL",
+				assert.Contains(t, attr.Constraints, "ENUM:PROPER_PERSON,CORPORATE,INSTITUTIONAL",
 					"investor.type should have specific enum constraints")
 			case "investor.nationality":
 				assert.Contains(t, attr.Constraints, "REGEX:^[A-Z]{2}$",

@@ -37,7 +37,7 @@ type UBODiscoveryResponse struct {
 
 // UBOResult represents an identified UBO
 type UBOResult struct {
-	PersonID           string  `json:"person_id"`
+	ProperPersonID           string  `json:"proper_person_id"`
 	Name               string  `json:"name"`
 	RelationshipType   string  `json:"relationship_type"`
 	OwnershipPercent   float64 `json:"ownership_percent"`
@@ -297,8 +297,8 @@ func parseUBOResults(ubos map[string]interface{}) []UBOResult {
 		for _, uboData := range uboList {
 			result := UBOResult{}
 
-			if personID, ok := uboData["person_id"].(string); ok {
-				result.PersonID = personID
+			if personID, ok := uboData["proper_person_id"].(string); ok {
+				result.ProperPersonID = personID
 			}
 			if name, ok := uboData["name"].(string); ok {
 				result.Name = name
@@ -374,7 +374,7 @@ func displayUBOResults(response *UBODiscoveryResponse, verbose bool) {
 
 		for i, ubo := range response.UBOsIdentified {
 			fmt.Printf("%d. %s\n", i+1, ubo.Name)
-			fmt.Printf("   └─ ID: %s\n", ubo.PersonID)
+			fmt.Printf("   └─ ID: %s\n", ubo.ProperPersonID)
 			fmt.Printf("   └─ Relationship: %s\n", ubo.RelationshipType)
 
 			if ubo.OwnershipPercent > 0 {

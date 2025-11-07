@@ -917,7 +917,7 @@ func TestEnumArgumentValidation(t *testing.T) {
 	// Test verbs with enum arguments have proper enum values
 	verbsWithEnums := map[string]map[string][]string{
 		"entity.register": {
-			"type": {"INDIVIDUAL", "CORPORATE", "FUND", "TRUST", "PARTNERSHIP"},
+			"type": {"PROPER_PERSON", "CORPORATE", "FUND", "TRUST", "PARTNERSHIP"},
 		},
 		"entity.classify": {
 			"risk-level": {"LOW", "MEDIUM", "HIGH", "PROHIBITED"},

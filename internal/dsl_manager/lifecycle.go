@@ -365,7 +365,7 @@ func (lm *DSLLifecycleManager) generateInitialDSL(domain string, initialData map
 			name = "Unknown Investor"
 		}
 		if investorType == "" {
-			investorType = "INDIVIDUAL"
+			investorType = "PROPER_PERSON"
 		}
 		return fmt.Sprintf("(investor.create\n  (name \"%s\")\n  (type \"%s\"))", name, investorType), nil
 

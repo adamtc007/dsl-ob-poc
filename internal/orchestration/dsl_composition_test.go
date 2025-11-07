@@ -115,7 +115,7 @@ func TestDSLCompositionEngine_ComposeMasterDSL(t *testing.T) {
 			name: "Individual Hedge Fund Investor",
 			request: &CompositionRequest{
 				EntityName:     "John Smith",
-				EntityType:     "INDIVIDUAL",
+				EntityType:     "PROPER_PERSON",
 				Jurisdiction:   "US",
 				Products:       []string{"HEDGE_FUND_INVESTMENT"},
 				WorkflowType:   "INVESTMENT",
@@ -128,14 +128,14 @@ func TestDSLCompositionEngine_ComposeMasterDSL(t *testing.T) {
 					"hedge-fund-investor": {"kyc"},
 				},
 				SessionID:   "test-session-003",
-				CBUID:       "CBU-HF-INDIVIDUAL-001",
+				CBUID:       "CBU-HF-PROPER_PERSON-001",
 				RequestedAt: time.Now(),
 			},
 			expectError: false,
 			validate: func(t *testing.T, result *CompositionResult) {
 				// Verify individual-specific DSL elements
 				assert.Contains(t, result.MasterDSL, "John Smith")
-				assert.Contains(t, result.MasterDSL, "INDIVIDUAL")
+				assert.Contains(t, result.MasterDSL, "PROPER_PERSON")
 				assert.Contains(t, result.MasterDSL, "HEDGE_FUND_INVESTMENT")
 
 				// Individual workflows should be simpler (no UBO)
@@ -236,7 +236,7 @@ func TestDSLCompositionEngine_BuildDependencyGraph(t *testing.T) {
 		{
 			name: "Individual Simple Dependencies",
 			request: &CompositionRequest{
-				EntityType:   "INDIVIDUAL",
+				EntityType:   "PROPER_PERSON",
 				Jurisdiction: "US",
 				Products:     []string{"HEDGE_FUND_INVESTMENT"},
 			},

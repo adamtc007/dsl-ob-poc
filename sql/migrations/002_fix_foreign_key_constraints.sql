@@ -299,18 +299,18 @@ BEGIN
     END IF;
 END $$;
 
--- Ensure ubo_registry.ubo_person_id references entities table
+-- Ensure ubo_registry.ubo_proper_person_id references entities table
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.table_constraints
-        WHERE constraint_name = 'fk_ubo_registry_ubo_person_id'
+        WHERE constraint_name = 'fk_ubo_registry_ubo_proper_person_id'
         AND table_name = 'ubo_registry'
         AND table_schema = 'dsl-ob-poc'
     ) THEN
         ALTER TABLE "dsl-ob-poc".ubo_registry
-        ADD CONSTRAINT fk_ubo_registry_ubo_person_id
-        FOREIGN KEY (ubo_person_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
+        ADD CONSTRAINT fk_ubo_registry_ubo_proper_person_id
+        FOREIGN KEY (ubo_proper_person_id) REFERENCES "dsl-ob-poc".entities(entity_id) ON DELETE CASCADE;
     END IF;
 END $$;
 

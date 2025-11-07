@@ -63,7 +63,7 @@ func (s *Step) validate() error {
 		if err := requireStringOrAttrRef("legal_name", a.LegalName); err != nil {
 			return err
 		}
-		if a.Type != "INDIVIDUAL" && a.Type != "CORPORATE" && a.Type != "TRUST" && a.Type != "FOHF" && a.Type != "NOMINEE" {
+		if a.Type != "PROPER_PERSON" && a.Type != "CORPORATE" && a.Type != "TRUST" && a.Type != "FOHF" && a.Type != "NOMINEE" {
 			return errors.New("type invalid")
 		}
 		if err := requireStringOrAttrRef("domicile", a.Domicile); err != nil {

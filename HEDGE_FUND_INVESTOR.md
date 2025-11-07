@@ -694,7 +694,7 @@ rm -rf hedge-fund-investor-source/
 export DSL_STORE_TYPE=mock
 export DSL_MOCK_DATA_PATH=hedge-fund-investor-source/hf-investor/mocks
 
-./dsl-poc hf-create-investor --code="TEST-001" --legal-name="Test Investor" --type="INDIVIDUAL" --domicile="US"
+./dsl-poc hf-create-investor --code="TEST-001" --legal-name="Test Investor" --type="PROPER_PERSON" --domicile="US"
 ```
 
 ### Production Deployment

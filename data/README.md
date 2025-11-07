@@ -38,7 +38,7 @@ If you have a live database with data, you can export it:
 - `entities.json` - Central entity registry
 - `entity_limited_companies.json` - Limited company details
 - `entity_partnerships.json` - Partnership details
-- `entity_individuals.json` - Individual person details
+- `entity_proper_persons.json` - Individual person details
 - `cbu_entity_roles.json` - CBU-entity-role relationships
 - `products.json` - Product catalog
 - `services.json` - Service catalog

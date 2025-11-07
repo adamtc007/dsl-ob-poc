@@ -129,7 +129,7 @@ func TestValidateDSLVerbs(t *testing.T) {
 		{
 			name: "All UBO verbs - identification",
 			dsl: `(ubo.resolve-ubos (entity_id "entity-1") (ownership_threshold 25.0))
-(ubo.calculate-indirect-ownership (person_id "person-1") (target_entity_id "entity-1"))
+(ubo.calculate-indirect-ownership (proper_person_id "person-1") (target_entity_id "entity-1"))
 (ubo.identify-control-prong (entity_id "entity-1") (control_types "CEO"))
 (ubo.apply-thresholds (ownership_results "data-1") (control_results "data-2"))`,
 			wantError: false,

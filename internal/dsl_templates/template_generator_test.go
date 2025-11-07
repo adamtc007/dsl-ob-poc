@@ -23,7 +23,7 @@ func TestDSLTemplateGenerator(t *testing.T) {
 			state:  "CREATED",
 			params: map[string]interface{}{
 				"name": "Alice Johnson",
-				"type": "INDIVIDUAL",
+				"type": "PROPER_PERSON",
 			},
 			wantError:  false,
 			wantPrefix: "(investor.create",

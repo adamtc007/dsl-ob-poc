@@ -147,7 +147,7 @@
       "required": ["legal_name", "type", "domicile"],
       "properties": {
         "legal_name": { "$ref": "#/$defs/Value" },
-        "type": { "type": "string", "enum": ["INDIVIDUAL","CORPORATE","TRUST","FOHF","NOMINEE"] },
+        "type": { "type": "string", "enum": ["PROPER_PERSON","CORPORATE","TRUST","FOHF","NOMINEE"] },
         "domicile": { "$ref": "#/$defs/Value" },
         "lei": { "$ref": "#/$defs/Value" },
         "registration_number": { "$ref": "#/$defs/Value" },

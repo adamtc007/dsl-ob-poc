@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"dsl-ob-poc/internal/datastore"
 	"dsl-ob-poc/internal/grammar"
@@ -63,7 +63,7 @@ func ValidateGrammarCommand(ctx context.Context, ds datastore.DataStore, args []
 	// Get DSL content
 	var dsl string
 	if *dslFile != "" {
-		content, err := ioutil.ReadFile(*dslFile)
+		content, err := os.ReadFile(*dslFile)
 		if err != nil {
 			return fmt.Errorf("failed to read DSL file %s: %w", *dslFile, err)
 		}
@@ -89,6 +89,3 @@ func ValidateGrammarCommand(ctx context.Context, ds datastore.DataStore, args []
 
 	return nil
 }
-
-
-

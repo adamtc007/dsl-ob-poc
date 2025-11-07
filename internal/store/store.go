@@ -156,7 +156,7 @@ type Partnership struct {
 
 // Individual represents an individual (proper person) entity.
 type Individual struct {
-	IndividualID     string     `json:"individual_id"`
+	ProperProperPersonID     string     `json:"proper_proper_person_id"`
 	FirstName        string     `json:"first_name"`
 	LastName         string     `json:"last_name"`
 	MiddleNames      string     `json:"middle_names"`
@@ -1697,7 +1697,7 @@ func (s *Store) SeedProductRequirements(ctx context.Context) error {
 	}{
 		{
 			name:        "CUSTODY",
-			entityTypes: []string{"TRUST", "CORPORATION", "PARTNERSHIP", "INDIVIDUAL"},
+			entityTypes: []string{"TRUST", "CORPORATION", "PARTNERSHIP", "PROPER_PERSON"},
 			requiredDSL: []string{"custody.account-setup", "custody.signatory-verification", "custody.asset-safekeeping"},
 			attributes:  []string{"custody.account_number", "custody.signatory_authority", "custody.asset_types"},
 			compliance: []map[string]interface{}{
@@ -1806,9 +1806,9 @@ func (s *Store) SeedProductRequirements(ctx context.Context) error {
 		{"PARTNERSHIP", "CUSTODY", true, []string{}, []string{"partnership_agreement", "general_partner_authority"}},
 		{"PARTNERSHIP", "FUND_ACCOUNTING", true, []string{}, []string{"capital_account_method", "allocation_method"}},
 		{"PARTNERSHIP", "TRANSFER_AGENCY", false, []string{"Partnerships typically use different investor tracking mechanisms"}, []string{}},
-		{"INDIVIDUAL", "CUSTODY", true, []string{}, []string{"identity_verification", "investment_capacity"}},
-		{"INDIVIDUAL", "FUND_ACCOUNTING", false, []string{"Fund accounting typically not required for individual accounts"}, []string{}},
-		{"INDIVIDUAL", "TRANSFER_AGENCY", false, []string{"Transfer agency services not applicable to individual accounts"}, []string{}},
+		{"PROPER_PERSON", "CUSTODY", true, []string{}, []string{"identity_verification", "investment_capacity"}},
+		{"PROPER_PERSON", "FUND_ACCOUNTING", false, []string{"Fund accounting typically not required for individual accounts"}, []string{}},
+		{"PROPER_PERSON", "TRANSFER_AGENCY", false, []string{"Transfer agency services not applicable to individual accounts"}, []string{}},
 	}
 
 	for _, mapping := range entityMappings {

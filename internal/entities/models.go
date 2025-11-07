@@ -91,17 +91,17 @@ type Partnership struct {
 
 // Individual represents a natural person
 type Individual struct {
-	IndividualID     uuid.UUID  `json:"individual_id" db:"individual_id"`
-	FirstName        string     `json:"first_name" db:"first_name"`
-	LastName         string     `json:"last_name" db:"last_name"`
-	MiddleNames      *string    `json:"middle_names" db:"middle_names"`
-	DateOfBirth      *time.Time `json:"date_of_birth" db:"date_of_birth"`
-	Nationality      *string    `json:"nationality" db:"nationality"`
-	ResidenceAddress *string    `json:"residence_address" db:"residence_address"`
-	IDDocumentType   *string    `json:"id_document_type" db:"id_document_type"`
-	IDDocumentNumber *string    `json:"id_document_number" db:"id_document_number"`
-	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
+	ProperProperPersonID uuid.UUID  `json:"proper_proper_person_id" db:"proper_proper_person_id"`
+	FirstName            string     `json:"first_name" db:"first_name"`
+	LastName             string     `json:"last_name" db:"last_name"`
+	MiddleNames          *string    `json:"middle_names" db:"middle_names"`
+	DateOfBirth          *time.Time `json:"date_of_birth" db:"date_of_birth"`
+	Nationality          *string    `json:"nationality" db:"nationality"`
+	ResidenceAddress     *string    `json:"residence_address" db:"residence_address"`
+	IDDocumentType       *string    `json:"id_document_type" db:"id_document_type"`
+	IDDocumentNumber     *string    `json:"id_document_number" db:"id_document_number"`
+	CreatedAt            time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // Trust represents a trust structure
@@ -132,7 +132,7 @@ type TrustParty struct {
 	TrustID         uuid.UUID  `json:"trust_id" db:"trust_id"`
 	EntityID        uuid.UUID  `json:"entity_id" db:"entity_id"`
 	PartyRole       string     `json:"party_role" db:"party_role"` // 'SETTLOR', 'TRUSTEE', 'BENEFICIARY', 'PROTECTOR'
-	PartyType       string     `json:"party_type" db:"party_type"` // 'NATURAL_PERSON', 'CORPORATE_TRUSTEE', 'BENEFICIARY_CLASS'
+	PartyType       string     `json:"party_type" db:"party_type"` // 'PROPER_PERSON', 'CORPORATE_TRUSTEE', 'BENEFICIARY_CLASS'
 	AppointmentDate *time.Time `json:"appointment_date" db:"appointment_date"`
 	ResignationDate *time.Time `json:"resignation_date" db:"resignation_date"`
 	IsActive        bool       `json:"is_active" db:"is_active"`
@@ -215,7 +215,7 @@ type UBORegistry struct {
 	UBOID               uuid.UUID  `json:"ubo_id" db:"ubo_id"`
 	CBUID               uuid.UUID  `json:"cbu_id" db:"cbu_id"`
 	SubjectEntityID     uuid.UUID  `json:"subject_entity_id" db:"subject_entity_id"`
-	UBOPersonID         uuid.UUID  `json:"ubo_person_id" db:"ubo_person_id"`
+	UBOProperPersonID   uuid.UUID  `json:"ubo_proper_person_id" db:"ubo_proper_person_id"`
 	RelationshipType    string     `json:"relationship_type" db:"relationship_type"` // 'DIRECT_OWNERSHIP', 'TRUST_SETTLOR', 'PARTNERSHIP_GP_CONTROL'
 	QualifyingReason    string     `json:"qualifying_reason" db:"qualifying_reason"` // 'OWNERSHIP_THRESHOLD', 'TRUST_CREATOR', 'ULTIMATE_CONTROL'
 	OwnershipPercentage *float64   `json:"ownership_percentage" db:"ownership_percentage"`
@@ -242,7 +242,7 @@ type UBORegistry struct {
 const (
 	EntityTypeLimitedCompany = "LIMITED_COMPANY"
 	EntityTypePartnership    = "PARTNERSHIP"
-	EntityTypeIndividual     = "INDIVIDUAL"
+	EntityTypeProperPerson   = "PROPER_PERSON"
 	EntityTypeTrust          = "TRUST"
 )
 
@@ -271,7 +271,7 @@ const (
 
 // Party Types (Trust)
 const (
-	TrustPartyTypeNaturalPerson    = "NATURAL_PERSON"
+	TrustPartyTypeNaturalPerson    = "PROPER_PERSON"
 	TrustPartyTypeCorporateTrustee = "CORPORATE_TRUSTEE"
 	TrustPartyTypeBeneficiaryClass = "BENEFICIARY_CLASS"
 )
@@ -334,7 +334,7 @@ func (i *Individual) GetFullName() string {
 
 // IsNaturalPerson returns true if the entity type represents a natural person
 func (e *Entity) IsNaturalPerson() bool {
-	return e.EntityType != nil && e.EntityType.Name == EntityTypeIndividual
+	return e.EntityType != nil && e.EntityType.Name == EntityTypeProperPerson
 }
 
 // IsCorporateEntity returns true if the entity type represents a corporate entity
@@ -352,7 +352,7 @@ func (e *Entity) RequiresUBOAnalysis() bool {
 		return false
 	}
 	// All entity types except individuals require UBO analysis
-	return e.EntityType.Name != EntityTypeIndividual
+	return e.EntityType.Name != EntityTypeProperPerson
 }
 
 // GetUBOWorkflowType returns the appropriate UBO workflow type for the entity

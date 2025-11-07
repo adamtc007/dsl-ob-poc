@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".product_requirements (
 
 -- Entity Product Mappings table: Compatibility matrix for entity types and products
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_product_mappings (
-    entity_type VARCHAR(100) NOT NULL,     -- TRUST, CORPORATION, PARTNERSHIP, INDIVIDUAL
+    entity_type VARCHAR(100) NOT NULL,     -- TRUST, CORPORATION, PARTNERSHIP, PROPER_PERSON
     product_id UUID NOT NULL REFERENCES "dsl-ob-poc".products (product_id) ON DELETE CASCADE,
     compatible BOOLEAN NOT NULL,           -- Whether this entity type can use this product
     restrictions JSONB,                    -- Array of restriction descriptions
@@ -349,9 +349,9 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_partnerships (
 CREATE INDEX IF NOT EXISTS idx_partnerships_type ON "dsl-ob-poc".entity_partnerships (partnership_type);
 CREATE INDEX IF NOT EXISTS idx_partnerships_jurisdiction ON "dsl-ob-poc".entity_partnerships (jurisdiction);
 
--- Proper Person (Individual) entity type
-CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_individuals (
-    individual_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Proper Person entity type
+CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_proper_persons (
+    proper_person_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     first_name VARCHAR(255) NOT NULL,
     last_name VARCHAR(255) NOT NULL,
     middle_names VARCHAR(255),
@@ -363,9 +363,9 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_individuals (
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc')
 );
-CREATE INDEX IF NOT EXISTS idx_individuals_full_name ON "dsl-ob-poc".entity_individuals (last_name, first_name);
-CREATE INDEX IF NOT EXISTS idx_individuals_nationality ON "dsl-ob-poc".entity_individuals (nationality);
-CREATE INDEX IF NOT EXISTS idx_individuals_id_document ON "dsl-ob-poc".entity_individuals (id_document_type, id_document_number);
+CREATE INDEX IF NOT EXISTS idx_proper_persons_full_name ON "dsl-ob-poc".entity_proper_persons (last_name, first_name);
+CREATE INDEX IF NOT EXISTS idx_proper_persons_nationality ON "dsl-ob-poc".entity_proper_persons (nationality);
+CREATE INDEX IF NOT EXISTS idx_proper_persons_id_document ON "dsl-ob-poc".entity_proper_persons (id_document_type, id_document_number);
 
 -- Trust entity type
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".entity_trusts (
@@ -393,7 +393,7 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".trust_parties (
     trust_id UUID NOT NULL REFERENCES "dsl-ob-poc".entity_trusts (trust_id) ON DELETE CASCADE,
     entity_id UUID NOT NULL REFERENCES "dsl-ob-poc".entities (entity_id) ON DELETE CASCADE,
     party_role VARCHAR(100) NOT NULL, -- 'SETTLOR', 'TRUSTEE', 'BENEFICIARY', 'PROTECTOR'
-    party_type VARCHAR(100) NOT NULL, -- 'NATURAL_PERSON', 'CORPORATE_TRUSTEE', 'BENEFICIARY_CLASS'
+    party_type VARCHAR(100) NOT NULL, -- 'PROPER_PERSON', 'CORPORATE_TRUSTEE', 'BENEFICIARY_CLASS'
     appointment_date DATE,
     resignation_date DATE,
     is_active BOOLEAN DEFAULT TRUE,
@@ -478,7 +478,7 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".ubo_registry (
     ubo_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cbu_id UUID NOT NULL REFERENCES "dsl-ob-poc".cbus (cbu_id) ON DELETE CASCADE,
     subject_entity_id UUID NOT NULL REFERENCES "dsl-ob-poc".entities (entity_id) ON DELETE CASCADE,
-    ubo_person_id UUID NOT NULL REFERENCES "dsl-ob-poc".entities (entity_id) ON DELETE CASCADE,
+    ubo_proper_person_id UUID NOT NULL REFERENCES "dsl-ob-poc".entities (entity_id) ON DELETE CASCADE,
     relationship_type VARCHAR(100) NOT NULL, -- 'DIRECT_OWNERSHIP', 'TRUST_SETTLOR', 'PARTNERSHIP_GP_CONTROL'
     qualifying_reason VARCHAR(100) NOT NULL, -- 'OWNERSHIP_THRESHOLD', 'TRUST_CREATOR', 'ULTIMATE_CONTROL'
     ownership_percentage DECIMAL(5,2),
@@ -492,11 +492,11 @@ CREATE TABLE IF NOT EXISTS "dsl-ob-poc".ubo_registry (
     verified_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
     updated_at TIMESTAMPTZ DEFAULT (now() at time zone 'utc'),
-    UNIQUE (subject_entity_id, ubo_person_id, relationship_type)
+    UNIQUE (subject_entity_id, ubo_proper_person_id, relationship_type)
 );
 CREATE INDEX IF NOT EXISTS idx_ubo_registry_cbu ON "dsl-ob-poc".ubo_registry (cbu_id);
 CREATE INDEX IF NOT EXISTS idx_ubo_registry_subject ON "dsl-ob-poc".ubo_registry (subject_entity_id);
-CREATE INDEX IF NOT EXISTS idx_ubo_registry_ubo_person ON "dsl-ob-poc".ubo_registry (ubo_person_id);
+CREATE INDEX IF NOT EXISTS idx_ubo_registry_ubo_proper_person ON "dsl-ob-poc".ubo_registry (ubo_proper_person_id);
 CREATE INDEX IF NOT EXISTS idx_ubo_registry_workflow ON "dsl-ob-poc".ubo_registry (workflow_type);
 
 -- ============================================================================
@@ -544,7 +544,7 @@ CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_state ON "dsl-ob-poc".orch
 CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_last_used ON "dsl-ob-poc".orchestration_sessions (last_used);
 CREATE INDEX IF NOT EXISTS idx_orchestration_sessions_expires ON "dsl-ob-poc".orchestration_sessions (expires_at);
 
--- Domain Sessions table: Individual domain sessions within orchestration
+-- Domain Sessions table: Specific domain sessions within orchestration
 CREATE TABLE IF NOT EXISTS "dsl-ob-poc".orchestration_domain_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     orchestration_session_id UUID NOT NULL REFERENCES "dsl-ob-poc".orchestration_sessions(session_id) ON DELETE CASCADE,

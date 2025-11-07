@@ -110,7 +110,7 @@ type SharedContext struct {
 	EntityID   string `json:"entity_id,omitempty"`
 
 	// Entity attributes
-	EntityType   string   `json:"entity_type,omitempty"` // INDIVIDUAL, CORPORATE, TRUST, etc.
+	EntityType   string   `json:"entity_type,omitempty"` // PROPER_PERSON, CORPORATE, TRUST, etc.
 	EntityName   string   `json:"entity_name,omitempty"`
 	Jurisdiction string   `json:"jurisdiction,omitempty"`
 	Products     []string `json:"products,omitempty"` // Requested products
@@ -623,7 +623,7 @@ func (o *Orchestrator) generateMasterDSL(ctx context.Context, req *Orchestration
 		compositionReq.EntityAttributes["HasProtector"] = false
 		compositionReq.EntityAttributes["IsDiscretionary"] = true
 		compositionReq.EntityAttributes["TrustType"] = "DISCRETIONARY"
-	case "INDIVIDUAL":
+	case "PROPER_PERSON":
 		compositionReq.EntityAttributes["RequiresEnhancedKYC"] = false
 	}
 
@@ -647,7 +647,7 @@ func (o *Orchestrator) generateMasterDSL(ctx context.Context, req *Orchestration
 				RequiredTemplates: []string{"custody_requirements"},
 				AttributeOverrides: map[string]interface{}{
 					"RequiresSegregation":       true,
-					"RequiresPrimeBrokerage":    req.EntityType != "INDIVIDUAL",
+					"RequiresPrimeBrokerage":    req.EntityType != "PROPER_PERSON",
 					"RequiresRealTimeReporting": req.ComplianceTier == "ENHANCED",
 				},
 			}
@@ -874,7 +874,7 @@ type OrchestrationRequest struct {
 	CBUID        string   `json:"cbu_id,omitempty"`
 	InvestorID   string   `json:"investor_id,omitempty"`
 	EntityID     string   `json:"entity_id,omitempty"`
-	EntityType   string   `json:"entity_type,omitempty"` // INDIVIDUAL, CORPORATE, TRUST
+	EntityType   string   `json:"entity_type,omitempty"` // PROPER_PERSON, CORPORATE, TRUST
 	EntityName   string   `json:"entity_name,omitempty"`
 	Jurisdiction string   `json:"jurisdiction,omitempty"`
 	Products     []string `json:"products,omitempty"`
@@ -945,7 +945,7 @@ func (o *Orchestrator) analyzeOnboardingContext(ctx context.Context, req *Orches
 		case "PARTNERSHIP":
 			analysis.RequiredDomains = append(analysis.RequiredDomains, "kyc", "ubo")
 			analysis.Dependencies["ubo"] = []string{"kyc"}
-		case "INDIVIDUAL":
+		case "PROPER_PERSON":
 			analysis.RequiredDomains = append(analysis.RequiredDomains, "kyc")
 		}
 	}

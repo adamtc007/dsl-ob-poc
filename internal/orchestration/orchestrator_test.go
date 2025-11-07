@@ -8,7 +8,7 @@
 // - DSL accumulation and state management
 // - Session lifecycle and cleanup
 //
-// The tests cover various entity types (CORPORATE, TRUST, INDIVIDUAL) and
+// The tests cover various entity types (CORPORATE, TRUST, PROPER_PERSON) and
 // product combinations to verify the orchestrator correctly determines
 // required domains and builds appropriate execution plans.
 package orchestration
@@ -178,7 +178,7 @@ func TestContextAnalysis(t *testing.T) {
 		{
 			name: "Individual Onboarding",
 			request: &OrchestrationRequest{
-				EntityType:   "INDIVIDUAL",
+				EntityType:   "PROPER_PERSON",
 				EntityName:   "John Smith",
 				Jurisdiction: "US",
 				Products:     []string{"CUSTODY"},
@@ -220,7 +220,7 @@ func TestContextAnalysis(t *testing.T) {
 		{
 			name: "Hedge Fund Investment Workflow",
 			request: &OrchestrationRequest{
-				EntityType:   "INDIVIDUAL",
+				EntityType:   "PROPER_PERSON",
 				EntityName:   "John Investor",
 				Products:     []string{"HEDGE_FUND_INVESTMENT"},
 				WorkflowType: "INVESTMENT",
@@ -415,7 +415,7 @@ func TestDSLAccumulation(t *testing.T) {
 
 	// Create a test session
 	req := &OrchestrationRequest{
-		EntityType: "INDIVIDUAL",
+		EntityType: "PROPER_PERSON",
 		EntityName: "John Smith",
 		Products:   []string{"CUSTODY"},
 	}
@@ -458,7 +458,7 @@ func TestSessionManagement(t *testing.T) {
 	sessions := make([]*OrchestrationSession, 3)
 	for i := 0; i < 3; i++ {
 		req := &OrchestrationRequest{
-			EntityType: "INDIVIDUAL",
+			EntityType: "PROPER_PERSON",
 			EntityName: fmt.Sprintf("Client %d", i+1),
 			Products:   []string{"CUSTODY"},
 		}
@@ -510,7 +510,7 @@ func TestSessionTimeout(t *testing.T) {
 
 	// Create a session
 	req := &OrchestrationRequest{
-		EntityType: "INDIVIDUAL",
+		EntityType: "PROPER_PERSON",
 		EntityName: "Test Client",
 		Products:   []string{"CUSTODY"},
 	}
@@ -548,7 +548,7 @@ func TestConcurrentSessions(t *testing.T) {
 	for i := 0; i < sessionCount; i++ {
 		go func(id int) {
 			req := &OrchestrationRequest{
-				EntityType: "INDIVIDUAL",
+				EntityType: "PROPER_PERSON",
 				EntityName: fmt.Sprintf("Concurrent Client %d", id),
 				Products:   []string{"CUSTODY"},
 			}
@@ -616,7 +616,7 @@ func TestSessionLimits(t *testing.T) {
 	// Create sessions up to limit
 	for i := 0; i < 2; i++ {
 		req := &OrchestrationRequest{
-			EntityType: "INDIVIDUAL",
+			EntityType: "PROPER_PERSON",
 			EntityName: fmt.Sprintf("Client %d", i+1),
 			Products:   []string{"CUSTODY"},
 		}
@@ -627,7 +627,7 @@ func TestSessionLimits(t *testing.T) {
 
 	// Attempt to create session beyond limit
 	req := &OrchestrationRequest{
-		EntityType: "INDIVIDUAL",
+		EntityType: "PROPER_PERSON",
 		EntityName: "Excess Client",
 		Products:   []string{"CUSTODY"},
 	}

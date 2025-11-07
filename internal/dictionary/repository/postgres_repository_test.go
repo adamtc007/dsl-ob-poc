@@ -30,11 +30,11 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 	require.NoError(t, db.PingContext(ctx), "Failed to ping test database")
 
 	// Clean up existing data
-	_, err = db.Exec("DELETE FROM dictionary_attributes")
-	require.NoError(t, err, "Failed to clear dictionary_attributes table")
+	_, err = db.Exec(`DELETE FROM "dsl-ob-poc".dictionary`)
+	require.NoError(t, err, "Failed to clear dictionary table")
 
 	cleanup := func() {
-		_, err := db.Exec("DELETE FROM dictionary_attributes")
+		_, err := db.Exec(`DELETE FROM "dsl-ob-poc".dictionary`)
 		if err != nil {
 			t.Logf("Warning: Failed to clean up test database: %v", err)
 		}

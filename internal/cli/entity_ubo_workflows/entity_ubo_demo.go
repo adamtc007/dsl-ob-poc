@@ -54,7 +54,7 @@ type EntityUBOResponse struct {
 
 // UBOIdentified represents an identified UBO from entity-specific workflow
 type UBOIdentified struct {
-	PersonID           string  `json:"person_id"`
+	ProperPersonID     string  `json:"proper_person_id"`
 	Name               string  `json:"name"`
 	RelationshipType   string  `json:"relationship_type"`
 	QualifyingReason   string  `json:"qualifying_reason"`
@@ -145,7 +145,7 @@ func (cmd *EntityUBOWorkflowsCommand) extractUBOsSummary(workflowResults map[str
 				if ubos, uboOK := trustData["trust_ubos"].([]map[string]interface{}); uboOK {
 					for _, ubo := range ubos {
 						ubosSummary = append(ubosSummary, UBOIdentified{
-							PersonID:           getStringValue(ubo, "person_id"),
+							ProperPersonID:     getStringValue(ubo, "proper_person_id"),
 							Name:               getStringValue(ubo, "name"),
 							RelationshipType:   getStringValue(ubo, "relationship_type"),
 							QualifyingReason:   getStringValue(ubo, "qualifying_reason"),
@@ -167,7 +167,7 @@ func (cmd *EntityUBOWorkflowsCommand) extractUBOsSummary(workflowResults map[str
 					if ownershipUBOs, ownershipOK := combinedAnalysis["ownership_prong_ubos"].([]map[string]interface{}); ownershipOK {
 						for _, ubo := range ownershipUBOs {
 							ubosSummary = append(ubosSummary, UBOIdentified{
-								PersonID:           getStringValue(ubo, "person_id"),
+								ProperPersonID:     getStringValue(ubo, "proper_person_id"),
 								Name:               getStringValue(ubo, "name"),
 								RelationshipType:   getStringValue(ubo, "relationship_type"),
 								QualifyingReason:   getStringValue(ubo, "qualifying_reason"),
@@ -182,7 +182,7 @@ func (cmd *EntityUBOWorkflowsCommand) extractUBOsSummary(workflowResults map[str
 					if controlUBOs, controlOK := combinedAnalysis["control_prong_ubos"].([]map[string]interface{}); controlOK {
 						for _, ubo := range controlUBOs {
 							ubosSummary = append(ubosSummary, UBOIdentified{
-								PersonID:           getStringValue(ubo, "person_id"),
+								ProperPersonID:     getStringValue(ubo, "proper_person_id"),
 								Name:               getStringValue(ubo, "name"),
 								RelationshipType:   getStringValue(ubo, "relationship_type"),
 								QualifyingReason:   getStringValue(ubo, "qualifying_reason"),
@@ -204,7 +204,7 @@ func (cmd *EntityUBOWorkflowsCommand) extractUBOsSummary(workflowResults map[str
 				if ubosList, listOK := uboData["ubos"].([]map[string]interface{}); listOK {
 					for _, ubo := range ubosList {
 						ubosSummary = append(ubosSummary, UBOIdentified{
-							PersonID:           getStringValue(ubo, "person_id"),
+							ProperPersonID:     getStringValue(ubo, "proper_person_id"),
 							Name:               getStringValue(ubo, "name"),
 							RelationshipType:   getStringValue(ubo, "relationship_type"),
 							QualifyingReason:   getStringValue(ubo, "qualifying_reason"),
@@ -281,7 +281,7 @@ func (cmd *EntityUBOWorkflowsCommand) displayWorkflowResults(request EntityUBORe
 
 	for i, ubo := range ubos {
 		fmt.Printf("%d. %s\n", i+1, ubo.Name)
-		fmt.Printf("   └─ Person ID: %s\n", ubo.PersonID)
+		fmt.Printf("   └─ Person ID: %s\n", ubo.ProperPersonID)
 		fmt.Printf("   └─ Relationship: %s\n", ubo.RelationshipType)
 		fmt.Printf("   └─ Qualifying Reason: %s\n", ubo.QualifyingReason)
 

@@ -29,12 +29,12 @@ func GenerateKYCAttributes() []dictionary.Attribute {
 		{
 			AttributeID:     uuid.New().String(),
 			Name:            "investor.type",
-			LongDescription: "Type of investor (individual, corporate, institutional)",
+			LongDescription: "Type of investor (proper person, corporate, institutional)",
 			GroupID:         "investor_classification",
 			Mask:            "ENUM",
 			Domain:          "KYC",
 			Tags:            []string{"CLASSIFICATION"},
-			Constraints:     []string{"REQUIRED", "ENUM:INDIVIDUAL,CORPORATE,INSTITUTIONAL"},
+			Constraints:     []string{"REQUIRED", "ENUM:PROPER_PERSON,CORPORATE,INSTITUTIONAL"},
 			Source: dictionary.SourceMetadata{
 				Primary: "INVESTOR_REGISTRATION",
 			},

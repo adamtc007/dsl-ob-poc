@@ -144,7 +144,7 @@ Where each **attributeID** is a **UUID** that references the **dictionary table*
 ```lisp
 (investor.start-opportunity
   @attr{uuid-0001}  ; → investor.legal_name (string, PII)
-  @attr{uuid-0002}  ; → investor.type (enum: INDIVIDUAL|CORPORATE|TRUST)
+  @attr{uuid-0002}  ; → investor.type (enum: PROPER_PERSON|CORPORATE|TRUST)
   @attr{uuid-0003}  ; → investor.domicile (string, ISO country code)
 )
 
@@ -314,7 +314,7 @@ Result: Self-describing, evolvable, auditable, compliant state machine
 **Dictionary lookups**:
 - `a1b2c3d4-...` → `investor_id` (uuid, primary key)
 - `e5f6a7b8-...` → `investor.legal_name` (string, PII, required)
-- `c9d0e1f2-...` → `investor.type` (enum: INDIVIDUAL|CORPORATE|TRUST|FOHF)
+- `c9d0e1f2-...` → `investor.type` (enum: PROPER_PERSON|CORPORATE|TRUST|FOHF)
 - `a3b4c5d6-...` → `investor.domicile` (string, ISO-3166-1 alpha-2)
 
 **Chat State**:

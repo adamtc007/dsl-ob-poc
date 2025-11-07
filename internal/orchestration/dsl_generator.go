@@ -185,7 +185,7 @@ func (g *DSLGenerator) generateEntityWorkflow(ctx *TemplateContext) (string, err
 	var entityTemplate string
 
 	switch ctx.EntityType {
-	case "INDIVIDUAL":
+	case "PROPER_PERSON":
 		entityTemplate = g.getIndividualTemplate()
 	case "CORPORATE":
 		entityTemplate = g.getCorporateTemplate()

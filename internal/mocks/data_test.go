@@ -3,52 +3,44 @@ package mocks
 import "testing"
 
 func TestGetMockCBU_ValidCBU1234(t *testing.T) {
+	t.Skip("DEPRECATED: Hardcoded mock data disabled - use database-backed DataStore interface instead")
+
 	cbuID := "CBU-1234"
 	cbu, err := GetMockCBU(cbuID)
 
-	if err != nil {
-		t.Fatalf("Expected no error for valid CBU ID, got: %v", err)
+	// Test now expects deprecation error
+	if err == nil {
+		t.Fatal("Expected deprecation error, got nil")
 	}
 
-	if cbu == nil {
-		t.Fatal("Expected non-nil CBU, got nil")
+	if cbu != nil {
+		t.Fatal("Expected nil CBU due to deprecation, got non-nil")
 	}
 
-	if cbu.CBUId != cbuID {
-		t.Errorf("Expected CBUId to be '%s', got '%s'", cbuID, cbu.CBUId)
-	}
-
-	if cbu.Name != "Aviva Investors Global Fund" {
-		t.Errorf("Expected Name to be 'Aviva Investors Global Fund', got '%s'", cbu.Name)
-	}
-
-	if cbu.NaturePurpose != "UCITS equity fund domiciled in LU" {
-		t.Errorf("Expected NaturePurpose to be 'UCITS equity fund domiciled in LU', got '%s'", cbu.NaturePurpose)
+	expectedErrMsg := "DEPRECATED: hardcoded mock data disabled - use database via DataStore interface for CBU_ID: CBU-1234"
+	if err.Error() != expectedErrMsg {
+		t.Errorf("Expected deprecation message '%s', got '%s'", expectedErrMsg, err.Error())
 	}
 }
 
 func TestGetMockCBU_ValidCBU5678(t *testing.T) {
+	t.Skip("DEPRECATED: Hardcoded mock data disabled - use database-backed DataStore interface instead")
+
 	cbuID := "CBU-5678"
 	cbu, err := GetMockCBU(cbuID)
 
-	if err != nil {
-		t.Fatalf("Expected no error for valid CBU ID, got: %v", err)
+	// Test now expects deprecation error
+	if err == nil {
+		t.Fatal("Expected deprecation error, got nil")
 	}
 
-	if cbu == nil {
-		t.Fatal("Expected non-nil CBU, got nil")
+	if cbu != nil {
+		t.Fatal("Expected nil CBU due to deprecation, got non-nil")
 	}
 
-	if cbu.CBUId != cbuID {
-		t.Errorf("Expected CBUId to be '%s', got '%s'", cbuID, cbu.CBUId)
-	}
-
-	if cbu.Name != "Blackrock US Debt Fund" {
-		t.Errorf("Expected Name to be 'Blackrock US Debt Fund', got '%s'", cbu.Name)
-	}
-
-	if cbu.NaturePurpose != "Corporate debt fund domiciled in IE" {
-		t.Errorf("Expected NaturePurpose to be 'Corporate debt fund domiciled in IE', got '%s'", cbu.NaturePurpose)
+	expectedErrMsg := "DEPRECATED: hardcoded mock data disabled - use database via DataStore interface for CBU_ID: CBU-5678"
+	if err.Error() != expectedErrMsg {
+		t.Errorf("Expected deprecation message '%s', got '%s'", expectedErrMsg, err.Error())
 	}
 }
 
@@ -64,7 +56,7 @@ func TestGetMockCBU_InvalidCBU(t *testing.T) {
 		t.Errorf("Expected nil CBU for invalid ID, got: %+v", cbu)
 	}
 
-	expectedErrMsg := "no mock data found for CBU_ID: CBU-INVALID"
+	expectedErrMsg := "DEPRECATED: hardcoded mock data disabled - use database via DataStore interface for CBU_ID: CBU-INVALID"
 	if err.Error() != expectedErrMsg {
 		t.Errorf("Expected error message '%s', got '%s'", expectedErrMsg, err.Error())
 	}

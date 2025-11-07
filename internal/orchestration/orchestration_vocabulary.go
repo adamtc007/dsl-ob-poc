@@ -76,7 +76,7 @@ func (ov *OrchestrationVocabulary) initializeOrchestrationVerbs() {
 			{Name: "session.id", Type: "string", Required: true, Description: "Unique session identifier"},
 			{Name: "cbu.id", Type: "string", Required: true, Description: "CBU identifier"},
 			{Name: "entity.name", Type: "string", Required: true, Description: "Primary entity name"},
-			{Name: "entity.type", Type: "string", Required: true, Description: "Entity type (INDIVIDUAL, CORPORATE, TRUST)"},
+			{Name: "entity.type", Type: "string", Required: true, Description: "Entity type (PROPER_PERSON, CORPORATE, TRUST)"},
 			{Name: "jurisdiction", Type: "string", Required: true, Description: "Primary jurisdiction"},
 			{Name: "products", Type: "stringList", Required: true, Description: "Required products"},
 		},

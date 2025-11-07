@@ -9,20 +9,20 @@ INSERT INTO "dsl-ob-poc".dictionary (attribute_id, name, long_description, group
 ('123e4567-e89b-12d3-a456-426614174003', 'onboard.status', 'Current onboarding status', 'Onboarding', 'enum', 'Onboarding', '', '{"type": "derived", "values": ["PENDING", "IN_PROGRESS", "APPROVED", "REJECTED"]}', '{"type": "database", "table": "onboarding_cases"}', NOW(), NOW()),
 
 -- Entity Information (skip entity.legal_name as it already exists)
-('987fcdeb-51a2-43f7-8765-ba9876543202', 'entity.type', 'Type of entity (individual, corporate, trust, etc.)', 'Entity', 'enum', 'Legal', '', '{"type": "manual", "required": true, "values": ["INDIVIDUAL", "CORPORATE", "TRUST", "PARTNERSHIP"]}', '{"type": "database", "table": "entities"}', NOW(), NOW()),
+('987fcdeb-51a2-43f7-8765-ba9876543202', 'entity.type', 'Type of entity (proper person, corporate, trust, etc.)', 'Entity', 'enum', 'Legal', '', '{"type": "manual", "required": true, "values": ["PROPER_PERSON", "CORPORATE", "TRUST", "PARTNERSHIP"]}', '{"type": "database", "table": "entities"}', NOW(), NOW()),
 -- Skip entity.domicile as it already exists
 ('987fcdeb-51a2-43f7-8765-ba9876543204', 'entity.incorporation_date', 'Date of incorporation', 'Entity', 'date', 'Legal', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "entities"}', NOW(), NOW()),
 ('987fcdeb-51a2-43f7-8765-ba9876543205', 'entity.registration_number', 'Official registration number', 'Entity', 'string', 'Legal', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "entities"}', NOW(), NOW()),
 
--- Individual KYC Attributes
-('456789ab-cdef-1234-5678-9abcdef01201', 'kyc.individual.net_worth', 'Individual net worth', 'KYC', 'decimal', 'KYC', '', '{"type": "manual", "required": true, "validation": "positive_number"}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
-('456789ab-cdef-1234-5678-9abcdef01202', 'kyc.individual.annual_income', 'Annual income of individual', 'KYC', 'decimal', 'KYC', '', '{"type": "manual", "required": true, "validation": "positive_number"}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
-('456789ab-cdef-1234-5678-9abcdef01203', 'kyc.individual.source_of_wealth', 'Source of wealth description', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
-('456789ab-cdef-1234-5678-9abcdef01204', 'kyc.individual.source_of_funds', 'Source of funds for investment', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
-('456789ab-cdef-1234-5678-9abcdef01205', 'kyc.individual.occupation', 'Current occupation', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
-('456789ab-cdef-1234-5678-9abcdef01206', 'kyc.individual.date_of_birth', 'Date of birth', 'KYC', 'date', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
-('456789ab-cdef-1234-5678-9abcdef01207', 'kyc.individual.nationality', 'Nationality', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true, "format": "ISO-3166-1"}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
-('456789ab-cdef-1234-5678-9abcdef01208', 'kyc.individual.passport_number', 'Passport number', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": false}', '{"type": "database", "table": "kyc_individual"}', NOW(), NOW()),
+-- Proper Person KYC Attributes
+('456789ab-cdef-1234-5678-9abcdef01201', 'kyc.proper_person.net_worth', 'Proper Person net worth', 'KYC', 'decimal', 'KYC', '', '{"type": "manual", "required": true, "validation": "positive_number"}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01202', 'kyc.proper_person.annual_income', 'Annual income of individual', 'KYC', 'decimal', 'KYC', '', '{"type": "manual", "required": true, "validation": "positive_number"}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01203', 'kyc.proper_person.source_of_wealth', 'Source of wealth description', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01204', 'kyc.proper_person.source_of_funds', 'Source of funds for investment', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01205', 'kyc.proper_person.occupation', 'Current occupation', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01206', 'kyc.proper_person.date_of_birth', 'Date of birth', 'KYC', 'date', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01207', 'kyc.proper_person.nationality', 'Nationality', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true, "format": "ISO-3166-1"}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01208', 'kyc.proper_person.passport_number', 'Passport number', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": false}', '{"type": "database", "table": "kyc_proper_person"}', NOW(), NOW()),
 
 -- Corporate KYC Attributes
 ('789abcde-f012-3456-7890-abcdef123401', 'kyc.corporate.business_activity', 'Primary business activity', 'KYC', 'string', 'KYC', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "kyc_corporate"}', NOW(), NOW()),

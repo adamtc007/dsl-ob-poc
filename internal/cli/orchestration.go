@@ -62,7 +62,7 @@ func RunOrchestrationCreate(ctx context.Context, dataStore datastore.DataStore, 
 
 	// Entity context
 	cbuid := fs.String("cbu", "", "CBU ID for the workflow")
-	entityType := fs.String("entity-type", "", "Entity type (INDIVIDUAL, CORPORATE, TRUST, PARTNERSHIP)")
+	entityType := fs.String("entity-type", "", "Entity type (PROPER_PERSON, CORPORATE, TRUST, PARTNERSHIP)")
 	entityName := fs.String("entity-name", "", "Entity name")
 	jurisdiction := fs.String("jurisdiction", "", "Entity jurisdiction (ISO country code)")
 
@@ -424,7 +424,7 @@ func RunOrchestrationList(ctx context.Context, dataStore datastore.DataStore, ar
 func RunOrchestrationDemo(ctx context.Context, dataStore datastore.DataStore, args []string) error {
 	fs := flag.NewFlagSet("orchestrate-demo", flag.ExitOnError)
 
-	entityType := fs.String("entity-type", "CORPORATE", "Entity type for demo (INDIVIDUAL, CORPORATE, TRUST)")
+	entityType := fs.String("entity-type", "CORPORATE", "Entity type for demo (PROPER_PERSON, CORPORATE, TRUST)")
 	skipDelay := fs.Bool("fast", false, "Skip delays between steps")
 
 	if err := fs.Parse(args); err != nil {

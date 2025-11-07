@@ -714,7 +714,7 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 				Type:        registry.ArgumentTypeEnum,
 				Required:    true,
 				Description: "Entity type",
-				EnumValues:  []string{"INDIVIDUAL", "CORPORATE", "FUND", "TRUST", "PARTNERSHIP"},
+				EnumValues:  []string{"PROPER_PERSON", "CORPORATE", "FUND", "TRUST", "PARTNERSHIP"},
 			},
 			"jurisdiction": {
 				Name:        "jurisdiction",

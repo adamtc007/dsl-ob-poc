@@ -580,8 +580,8 @@ func (s *ProductRequirementsServiceImpl) evaluateCondition(condition, entityType
 		return entityType == "PARTNERSHIP"
 	case "entity_type == 'CORPORATION'":
 		return entityType == "CORPORATION"
-	case "entity_type == 'INDIVIDUAL'":
-		return entityType == "INDIVIDUAL"
+	case "entity_type == 'PROPER_PERSON'":
+		return entityType == "PROPER_PERSON"
 	default:
 		return false
 	}

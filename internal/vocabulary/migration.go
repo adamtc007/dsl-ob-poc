@@ -108,7 +108,7 @@ func (m *MigrationServiceImpl) extractOnboardingVocabulary() []DomainVocabulary 
 			Category:    stringPtr("entity_identity"),
 			Description: stringPtr("Register a new entity"),
 			Parameters: map[string]interface{}{
-				"type":         VerbParameter{Name: "type", Type: "enum", Required: true, Description: "Entity type", EnumValues: []string{"INDIVIDUAL", "CORPORATE", "TRUST", "PARTNERSHIP"}},
+				"type":         VerbParameter{Name: "type", Type: "enum", Required: true, Description: "Entity type", EnumValues: []string{"PROPER_PERSON", "CORPORATE", "TRUST", "PARTNERSHIP"}},
 				"jurisdiction": VerbParameter{Name: "jurisdiction", Type: "string", Required: true, Description: "Legal jurisdiction"},
 			},
 			Examples: []interface{}{
@@ -500,7 +500,7 @@ func (m *MigrationServiceImpl) extractHedgeFundVocabulary() []DomainVocabulary {
 			Parameters: map[string]interface{}{
 				"investor_id":   VerbParameter{Name: "investor_id", Type: "uuid", Required: true, Description: "Investor identifier"},
 				"legal_name":    VerbParameter{Name: "legal_name", Type: "string", Required: true, Description: "Legal name of investor"},
-				"investor_type": VerbParameter{Name: "investor_type", Type: "enum", Required: true, Description: "Type of investor", EnumValues: []string{"INDIVIDUAL", "CORPORATE", "TRUST", "FOHF"}},
+				"investor_type": VerbParameter{Name: "investor_type", Type: "enum", Required: true, Description: "Type of investor", EnumValues: []string{"PROPER_PERSON", "CORPORATE", "TRUST", "FOHF"}},
 				"domicile":      VerbParameter{Name: "domicile", Type: "string", Required: true, Description: "Investor domicile country code"},
 			},
 			Examples: []interface{}{
@@ -586,7 +586,7 @@ func (m *MigrationServiceImpl) extractOrchestrationVocabulary() []DomainVocabula
 			Description: stringPtr("Create orchestration session"),
 			Parameters: map[string]interface{}{
 				"session_id":   VerbParameter{Name: "session_id", Type: "uuid", Required: true, Description: "Orchestration session identifier"},
-				"entity_type":  VerbParameter{Name: "entity_type", Type: "enum", Required: true, Description: "Entity type", EnumValues: []string{"INDIVIDUAL", "CORPORATE", "TRUST", "PARTNERSHIP"}},
+				"entity_type":  VerbParameter{Name: "entity_type", Type: "enum", Required: true, Description: "Entity type", EnumValues: []string{"PROPER_PERSON", "CORPORATE", "TRUST", "PARTNERSHIP"}},
 				"products":     VerbParameter{Name: "products", Type: "array", Required: true, Description: "Required products"},
 				"jurisdiction": VerbParameter{Name: "jurisdiction", Type: "string", Required: true, Description: "Legal jurisdiction"},
 			},

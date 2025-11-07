@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -121,7 +122,7 @@ func (r *PostgresRepository) GetGrammarRule(ctx context.Context, ruleID string) 
 		WHERE rule_id = $1`
 
 	err := r.getContext(ctx, &rule, query, ruleID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("grammar rule not found: %s", ruleID)
 	}
 	if err != nil {
@@ -141,7 +142,7 @@ func (r *PostgresRepository) GetGrammarRuleByName(ctx context.Context, ruleName 
 		LIMIT 1`
 
 	err := r.getContext(ctx, &rule, query, ruleName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("grammar rule not found: %s", ruleName)
 	}
 	if err != nil {
@@ -305,7 +306,7 @@ func (r *PostgresRepository) GetDomainVocab(ctx context.Context, vocabID string)
 		&vocab.CreatedAt, &vocab.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("domain vocabulary not found: %s", vocabID)
 	}
 	if err != nil {
@@ -340,7 +341,7 @@ func (r *PostgresRepository) GetDomainVocabByVerb(ctx context.Context, domain, v
 		&vocab.CreatedAt, &vocab.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("domain vocabulary not found: %s.%s", domain, verb)
 	}
 	if err != nil {

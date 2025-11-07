@@ -857,7 +857,7 @@ POST /api/onboarding/orchestrate
   "entities": [
     {"type": "TRUST", "name": "Smith Family Trust", "jurisdiction": "US", "role": "CLIENT"},
     {"type": "HEDGE_FUND", "name": "Alpha Fund LP", "jurisdiction": "GB", "role": "INVESTMENT_VEHICLE"},
-    {"type": "INDIVIDUAL", "name": "John Smith", "role": "UBO"}
+    {"type": "PROPER_PERSON", "name": "John Smith", "role": "UBO"}
   ],
   "products": ["CUSTODY", "FUND_ACCOUNTING", "TRANSFER_AGENT"],
   "regulatory_frameworks": ["FINCEN_CDD", "EU_5MLD", "FATF_TRUST"]

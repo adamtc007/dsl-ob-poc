@@ -28,7 +28,7 @@ func TestGetAttributeValues_Integration(t *testing.T) {
 	createMockFile(t, mockDataDir, "entities.json", `[]`)
 	createMockFile(t, mockDataDir, "entity_limited_companies.json", `[]`)
 	createMockFile(t, mockDataDir, "entity_partnerships.json", `[]`)
-	createMockFile(t, mockDataDir, "entity_individuals.json", `[]`)
+	createMockFile(t, mockDataDir, "entity_proper_persons.json", `[]`)
 	createMockFile(t, mockDataDir, "cbu_entity_roles.json", `[]`)
 	createMockFile(t, mockDataDir, "products.json", `[
 		{"product_id": "test-product", "name": "Test Product", "description": "Test product"}

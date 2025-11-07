@@ -29,7 +29,7 @@ Entity Relationship Model
 ├── cbu_entity_roles (CBU-entity-role relationships)
 ├── entity_limited_companies (limited company details)
 ├── entity_partnerships (partnership details)
-├── entity_individuals (individual person details)
+├── entity_proper_persons (individual person details)
 
 Data Dictionary
 ├── dictionary (attribute definitions with JSONB metadata)
@@ -208,11 +208,11 @@ Links CBUs to entities through specific roles (many-to-many-to-many).
 | created_at | TIMESTAMPTZ | DEFAULT (now() at time zone 'utc') | Creation timestamp |
 | updated_at | TIMESTAMPTZ | DEFAULT (now() at time zone 'utc') | Last update timestamp |
 
-### `entity_individuals` - Individual Person Details
+### `entity_proper_persons` - Individual Person Details
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| individual_id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique individual identifier |
+| proper_person_id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique individual identifier |
 | first_name | VARCHAR(255) | NOT NULL | First name |
 | last_name | VARCHAR(255) | NOT NULL | Last name |
 | middle_names | VARCHAR(255) | NULLABLE | Middle names |

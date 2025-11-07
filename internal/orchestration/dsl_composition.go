@@ -8,6 +8,26 @@ import (
 	"time"
 )
 
+// Entity type constants
+const (
+	EntityTypeProperPerson = "PROPER_PERSON"
+	EntityTypeCorporate    = "CORPORATE"
+	EntityTypeTrust        = "TRUST"
+	EntityTypePartnership  = "PARTNERSHIP"
+)
+
+// Product constants
+const (
+	ProductCustody             = "CUSTODY"
+	ProductTrading             = "TRADING"
+	ProductHedgeFundInvestment = "HEDGE_FUND_INVESTMENT"
+)
+
+// Compliance tier constants
+const (
+	ComplianceTierEnhanced = "ENHANCED"
+)
+
 // DSLCompositionEngine handles the merging and composition of multiple DSL templates
 // into a single, coherent Master DSL document for orchestration workflows
 type DSLCompositionEngine struct {
@@ -224,17 +244,17 @@ func (ce *DSLCompositionEngine) buildDependencyGraph(req *CompositionRequest) (m
 
 	// Base entity dependencies
 	switch req.EntityType {
-	case "INDIVIDUAL":
+	case EntityTypeProperPerson:
 		depGraph["kyc"] = []string{"onboarding"}
 		depGraph["hedge-fund-investor"] = []string{"kyc"} // if applicable
-	case "CORPORATE":
+	case EntityTypeCorporate:
 		depGraph["kyc"] = []string{"onboarding"}
 		depGraph["ubo"] = []string{"kyc"}
-	case "TRUST":
+	case EntityTypeTrust:
 		depGraph["kyc"] = []string{"onboarding"}
 		depGraph["trust-kyc"] = []string{"kyc"}
 		depGraph["ubo"] = []string{"trust-kyc"}
-	case "PARTNERSHIP":
+	case EntityTypePartnership:
 		depGraph["kyc"] = []string{"onboarding"}
 		depGraph["ubo"] = []string{"kyc"}
 	}
@@ -242,16 +262,16 @@ func (ce *DSLCompositionEngine) buildDependencyGraph(req *CompositionRequest) (m
 	// Product dependencies
 	for _, product := range req.Products {
 		switch product {
-		case "CUSTODY":
+		case ProductCustody:
 			depGraph["custody"] = []string{"onboarding"}
-			if req.EntityType != "INDIVIDUAL" {
+			if req.EntityType != EntityTypeProperPerson {
 				depGraph["custody"] = append(depGraph["custody"], "ubo")
 			}
-		case "TRADING":
+		case ProductTrading:
 			depGraph["trading"] = []string{"onboarding", "custody"}
 		case "FUND_ACCOUNTING":
 			depGraph["fund-accounting"] = []string{"custody"}
-		case "HEDGE_FUND_INVESTMENT":
+		case ProductHedgeFundInvestment:
 			depGraph["hedge-fund-investor"] = []string{"kyc"}
 		}
 	}
@@ -260,12 +280,12 @@ func (ce *DSLCompositionEngine) buildDependencyGraph(req *CompositionRequest) (m
 	switch req.Jurisdiction {
 	case "US":
 		depGraph["us-compliance"] = []string{"kyc"}
-		if req.EntityType != "INDIVIDUAL" {
+		if req.EntityType != EntityTypeProperPerson {
 			depGraph["us-compliance"] = append(depGraph["us-compliance"], "ubo")
 		}
 	case "LU", "DE", "FR", "IE", "NL": // EU jurisdictions
 		depGraph["eu-compliance"] = []string{"kyc"}
-		if req.EntityType != "INDIVIDUAL" {
+		if req.EntityType != "PROPER_PERSON" {
 			depGraph["eu-compliance"] = append(depGraph["eu-compliance"], "ubo")
 		}
 	case "CH":
@@ -334,17 +354,17 @@ func (ce *DSLCompositionEngine) composeEntityWorkflow(ctx context.Context, req *
 	var err error
 
 	switch req.EntityType {
-	case "INDIVIDUAL":
+	case EntityTypeProperPerson:
 		entityDSL, err = ce.renderTemplate("individual_workflow", templateCtx)
-	case "CORPORATE":
+	case EntityTypeCorporate:
 		if ce.requiresUBOAnalysis(req) {
 			entityDSL, err = ce.renderTemplate("corporate_ubo_workflow", templateCtx)
 		} else {
 			entityDSL, err = ce.renderTemplate("corporate_basic_workflow", templateCtx)
 		}
-	case "TRUST":
+	case EntityTypeTrust:
 		entityDSL, err = ce.renderTemplate("trust_ubo_workflow", templateCtx)
-	case "PARTNERSHIP":
+	case EntityTypePartnership:
 		entityDSL, err = ce.renderTemplate("partnership_ubo_workflow", templateCtx)
 	default:
 		return "", fmt.Errorf("unsupported entity type: %s", req.EntityType)
@@ -397,7 +417,7 @@ func (ce *DSLCompositionEngine) composeComplianceWorkflows(ctx context.Context, 
 	// Generate jurisdiction-specific compliance
 	switch req.Jurisdiction {
 	case "US":
-		if req.EntityType != "INDIVIDUAL" {
+		if req.EntityType != "PROPER_PERSON" {
 			dsl, err := ce.renderTemplate("fincen_control_prong", templateCtx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to render FinCEN control prong: %w", err)
@@ -419,7 +439,7 @@ func (ce *DSLCompositionEngine) composeComplianceWorkflows(ctx context.Context, 
 	}
 
 	// Generate compliance tier-specific requirements
-	if req.ComplianceTier == "ENHANCED" {
+	if req.ComplianceTier == ComplianceTierEnhanced {
 		dsl, err := ce.renderTemplate("enhanced_due_diligence", templateCtx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to render enhanced due diligence: %w", err)
@@ -546,7 +566,7 @@ func (ce *DSLCompositionEngine) extractAttributes(overrides map[string]interface
 }
 
 func (ce *DSLCompositionEngine) requiresUBOAnalysis(req *CompositionRequest) bool {
-	return req.EntityType != "INDIVIDUAL" && (req.Jurisdiction == "US" || ce.isEUJurisdiction(req.Jurisdiction))
+	return req.EntityType != "PROPER_PERSON" && (req.Jurisdiction == "US" || ce.isEUJurisdiction(req.Jurisdiction))
 }
 
 func (ce *DSLCompositionEngine) isEUJurisdiction(jurisdiction string) bool {

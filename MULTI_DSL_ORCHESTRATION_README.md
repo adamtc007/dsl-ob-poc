@@ -140,7 +140,7 @@ Entity Type + Products + Jurisdiction → Required Domains + Dependencies
 
 **Examples:**
 - `CORPORATE + [CUSTODY,TRADING] + US` → `[onboarding, kyc, ubo, custody, trading, us-compliance]`
-- `INDIVIDUAL + [HEDGE_FUND] + LU` → `[hedge-fund-investor, kyc, eu-compliance]`
+- `PROPER_PERSON + [HEDGE_FUND] + LU` → `[hedge-fund-investor, kyc, eu-compliance]`
 - `TRUST + [CUSTODY] + CH` → `[onboarding, kyc, ubo, trust-kyc, custody]`
 
 ### 2. Execution Planning
@@ -263,7 +263,7 @@ go test -v ./internal/orchestration/ -run TestDSLAccumulation
 
 # Test different entity types
 ./dsl-poc orchestrate-demo --entity-type=TRUST
-./dsl-poc orchestrate-demo --entity-type=INDIVIDUAL
+./dsl-poc orchestrate-demo --entity-type=PROPER_PERSON
 ```
 
 ### Performance Testing

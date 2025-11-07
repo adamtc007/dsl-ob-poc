@@ -198,14 +198,14 @@ func (d *UBODomain) executeResolveUBOs(ctx context.Context, dsl string) (map[str
 		"status": "resolved",
 		"ubos": []map[string]interface{}{
 			{
-				"person_id":         "person-uuid-1",
+				"proper_person_id":  "person-uuid-1",
 				"name":              "John Smith",
 				"relationship_type": "DIRECT_OWNERSHIP",
 				"total_ownership":   25.0,
 				"qualifying_reason": "OWNERSHIP_THRESHOLD",
 			},
 			{
-				"person_id":         "person-uuid-2",
+				"proper_person_id":  "person-uuid-2",
 				"name":              "Jane Doe",
 				"relationship_type": "CONTROL_PRONG",
 				"control_type":      "CEO",
@@ -301,7 +301,7 @@ func (d *UBODomain) executeIdentifyTrustParties(ctx context.Context, dsl string)
 				{
 					"party_id":     "person-uuid-settlor-1",
 					"name":         "Alice Foundation Creator",
-					"party_type":   "NATURAL_PERSON",
+					"party_type":   "PROPER_PERSON",
 					"role":         "SETTLOR",
 					"nationality":  "US",
 					"significance": "TRUST_CREATOR_PRIMARY",
@@ -318,8 +318,8 @@ func (d *UBODomain) executeIdentifyTrustParties(ctx context.Context, dsl string)
 				},
 				{
 					"party_id":    "person-uuid-trustee-2",
-					"name":        "Bob Individual Trustee",
-					"party_type":  "NATURAL_PERSON",
+					"name":        "Bob Proper Person Trustee",
+					"party_type":  "PROPER_PERSON",
 					"role":        "TRUSTEE",
 					"nationality": "GB",
 				},
@@ -328,7 +328,7 @@ func (d *UBODomain) executeIdentifyTrustParties(ctx context.Context, dsl string)
 				{
 					"party_id":         "person-uuid-beneficiary-1",
 					"name":             "Charlie Named Beneficiary",
-					"party_type":       "NATURAL_PERSON",
+					"party_type":       "PROPER_PERSON",
 					"role":             "NAMED_BENEFICIARY",
 					"beneficiary_type": "NAMED",
 				},
@@ -345,7 +345,7 @@ func (d *UBODomain) executeIdentifyTrustParties(ctx context.Context, dsl string)
 				{
 					"party_id":   "person-uuid-protector-1",
 					"name":       "David Trust Protector",
-					"party_type": "NATURAL_PERSON",
+					"party_type": "PROPER_PERSON",
 					"role":       "PROTECTOR",
 					"powers":     []string{"TRUSTEE_APPOINTMENT", "TRUSTEE_REMOVAL", "DISTRIBUTION_VETO"},
 				},
@@ -372,7 +372,7 @@ func (d *UBODomain) executeResolveTrustUBOs(ctx context.Context, dsl string) (ma
 		"status": "trust_ubos_resolved",
 		"trust_ubos": []map[string]interface{}{
 			{
-				"person_id":             "person-uuid-settlor-1",
+				"proper_person_id":      "person-uuid-settlor-1",
 				"name":                  "Alice Foundation Creator",
 				"relationship_type":     "TRUST_SETTLOR",
 				"qualifying_reason":     "TRUST_CREATOR",
@@ -380,15 +380,15 @@ func (d *UBODomain) executeResolveTrustUBOs(ctx context.Context, dsl string) (ma
 				"risk_significance":     "HIGH",
 			},
 			{
-				"person_id":             "person-uuid-trustee-2",
-				"name":                  "Bob Individual Trustee",
+				"proper_person_id":      "person-uuid-trustee-2",
+				"name":                  "Bob Proper Person Trustee",
 				"relationship_type":     "TRUST_TRUSTEE",
 				"qualifying_reason":     "LEGAL_MANAGER",
 				"verification_required": true,
 				"risk_significance":     "HIGH",
 			},
 			{
-				"person_id":             "person-uuid-beneficiary-1",
+				"proper_person_id":      "person-uuid-beneficiary-1",
 				"name":                  "Charlie Named Beneficiary",
 				"relationship_type":     "TRUST_BENEFICIARY",
 				"qualifying_reason":     "NAMED_BENEFICIARY",
@@ -396,7 +396,7 @@ func (d *UBODomain) executeResolveTrustUBOs(ctx context.Context, dsl string) (ma
 				"risk_significance":     "MEDIUM",
 			},
 			{
-				"person_id":             "person-uuid-protector-1",
+				"proper_person_id":      "person-uuid-protector-1",
 				"name":                  "David Trust Protector",
 				"relationship_type":     "TRUST_PROTECTOR",
 				"qualifying_reason":     "ULTIMATE_CONTROL",
@@ -453,7 +453,7 @@ func (d *UBODomain) executeIdentifyOwnershipProng(ctx context.Context, dsl strin
 				{
 					"partner_id":           "person-uuid-lp-2",
 					"name":                 "High Net Worth Individual Beta",
-					"partner_type":         "INDIVIDUAL_LIMITED_PARTNER",
+					"partner_type":         "PROPER_PERSON_LIMITED_PARTNER",
 					"capital_commitment":   30000000.00,
 					"ownership_percentage": 35.0,
 					"exceeds_threshold":    true,
@@ -493,7 +493,7 @@ func (d *UBODomain) executeResolvePartnershipUBOs(ctx context.Context, dsl strin
 		"combined_analysis": map[string]interface{}{
 			"ownership_prong_ubos": []map[string]interface{}{
 				{
-					"person_id":            "person-uuid-lp-2",
+					"proper_person_id":     "person-uuid-lp-2",
 					"name":                 "High Net Worth Individual Beta",
 					"relationship_type":    "LIMITED_PARTNER_OWNERSHIP",
 					"ownership_percentage": 35.0,
@@ -503,7 +503,7 @@ func (d *UBODomain) executeResolvePartnershipUBOs(ctx context.Context, dsl strin
 			},
 			"control_prong_ubos": []map[string]interface{}{
 				{
-					"person_id":         "person-uuid-gp-manager-1",
+					"proper_person_id":  "person-uuid-gp-manager-1",
 					"name":              "Fund Manager Alpha",
 					"relationship_type": "GENERAL_PARTNER_CONTROL",
 					"control_type":      "FUND_MANAGEMENT",
@@ -511,7 +511,7 @@ func (d *UBODomain) executeResolvePartnershipUBOs(ctx context.Context, dsl strin
 					"prong_type":        "CONTROL",
 				},
 				{
-					"person_id":         "person-uuid-gp-manager-2",
+					"proper_person_id":  "person-uuid-gp-manager-2",
 					"name":              "Senior Partner Beta",
 					"relationship_type": "GENERAL_PARTNER_CONTROL",
 					"control_type":      "INVESTMENT_DECISIONS",
@@ -564,13 +564,13 @@ func (d *UBODomain) executeRecursiveEntityResolve(ctx context.Context, dsl strin
 					"analysis_depth": 2,
 					"ubos_found": []map[string]interface{}{
 						{
-							"person_id":            "person-uuid-llp-partner-1",
+							"proper_person_id":     "person-uuid-llp-partner-1",
 							"name":                 "Senior Trustee 1",
 							"ownership_percentage": 40.0,
 							"relationship_type":    "LLP_PARTNER",
 						},
 						{
-							"person_id":            "person-uuid-llp-partner-2",
+							"proper_person_id":     "person-uuid-llp-partner-2",
 							"name":                 "Senior Trustee 2",
 							"ownership_percentage": 35.0,
 							"relationship_type":    "LLP_PARTNER",
@@ -610,7 +610,7 @@ func (d *UBODomain) executeIdentifyFinCenControlRoles(ctx context.Context, dsl s
 		"control_roles_analysis": map[string]interface{}{
 			"primary_control_roles": []map[string]interface{}{
 				{
-					"person_id":               "person-uuid-ceo-1",
+					"proper_person_id":        "person-uuid-ceo-1",
 					"name":                    "John Smith",
 					"title":                   "Chief Executive Officer",
 					"fincen_qualifying_role":  "CEO",
@@ -619,7 +619,7 @@ func (d *UBODomain) executeIdentifyFinCenControlRoles(ctx context.Context, dsl s
 					"has_operational_control": true,
 				},
 				{
-					"person_id":               "person-uuid-cfo-1",
+					"proper_person_id":        "person-uuid-cfo-1",
 					"name":                    "Jane Doe",
 					"title":                   "Chief Financial Officer",
 					"fincen_qualifying_role":  "CFO",
@@ -630,7 +630,7 @@ func (d *UBODomain) executeIdentifyFinCenControlRoles(ctx context.Context, dsl s
 			},
 			"secondary_control_roles": []map[string]interface{}{
 				{
-					"person_id":               "person-uuid-coo-1",
+					"proper_person_id":        "person-uuid-coo-1",
 					"name":                    "Bob Johnson",
 					"title":                   "Chief Operating Officer",
 					"fincen_qualifying_role":  "COO",
@@ -639,7 +639,7 @@ func (d *UBODomain) executeIdentifyFinCenControlRoles(ctx context.Context, dsl s
 					"has_operational_control": true,
 				},
 				{
-					"person_id":               "person-uuid-president-1",
+					"proper_person_id":        "person-uuid-president-1",
 					"name":                    "Alice Brown",
 					"title":                   "President",
 					"fincen_qualifying_role":  "PRESIDENT",
@@ -650,7 +650,7 @@ func (d *UBODomain) executeIdentifyFinCenControlRoles(ctx context.Context, dsl s
 			},
 			"similar_function_roles": []map[string]interface{}{
 				{
-					"person_id":              "person-uuid-managing-director-1",
+					"proper_person_id":       "person-uuid-managing-director-1",
 					"name":                   "Charlie Wilson",
 					"title":                  "Managing Director",
 					"fincen_qualifying_role": "SIMILAR_FUNCTIONS",
@@ -681,7 +681,7 @@ func (d *UBODomain) executeApplyFinCenControlProng(ctx context.Context, dsl stri
 		"status": "fincen_control_prong_applied",
 		"control_prong_decision": map[string]interface{}{
 			"selected_control_person": map[string]interface{}{
-				"person_id":              "person-uuid-ceo-1",
+				"proper_person_id":       "person-uuid-ceo-1",
 				"name":                   "John Smith",
 				"title":                  "Chief Executive Officer",
 				"fincen_qualifying_role": "CEO",
@@ -689,7 +689,7 @@ func (d *UBODomain) executeApplyFinCenControlProng(ctx context.Context, dsl stri
 				"selection_method":       "FINCEN_HIERARCHY_RULE",
 			},
 			"decision_logic": map[string]interface{}{
-				"rule_applied":         "SINGLE_INDIVIDUAL_REQUIREMENT",
+				"rule_applied":         "SINGLE_PROPER_PERSON_REQUIREMENT",
 				"hierarchy_followed":   true,
 				"candidates_evaluated": 5,
 				"fallback_used":        false,
@@ -698,14 +698,14 @@ func (d *UBODomain) executeApplyFinCenControlProng(ctx context.Context, dsl stri
 			"fincen_compliance_status": "COMPLIANT",
 			"alternative_candidates": []map[string]interface{}{
 				{
-					"person_id":           "person-uuid-cfo-1",
+					"proper_person_id":    "person-uuid-cfo-1",
 					"name":                "Jane Doe",
 					"title":               "Chief Financial Officer",
 					"rank":                2,
 					"not_selected_reason": "LOWER_PRIORITY_THAN_CEO",
 				},
 				{
-					"person_id":           "person-uuid-managing-director-1",
+					"proper_person_id":    "person-uuid-managing-director-1",
 					"name":                "Charlie Wilson",
 					"title":               "Managing Director",
 					"rank":                5,
@@ -724,7 +724,7 @@ func (d *UBODomain) executeApplyFinCenControlProng(ctx context.Context, dsl stri
 	}
 
 	// In a real implementation, this would:
-	// 1. Apply FinCEN's "single individual" requirement
+	// 1. Apply FinCEN's "single proper person" requirement
 	// 2. Follow regulatory hierarchy: CEO > CFO > COO > President > GP > Managing Member
 	// 3. Apply tie-breaking rules when multiple people hold equivalent roles
 	// 4. Implement fallback to "similar functions" analysis

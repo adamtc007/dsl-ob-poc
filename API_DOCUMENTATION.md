@@ -136,7 +136,7 @@ GET /api/domains/hedge-fund-investor/vocabulary
           "type": "ENUM",
           "required": true,
           "description": "Type of investor",
-          "enum_values": ["INDIVIDUAL", "CORPORATE", "TRUST", "FOHF"]
+          "enum_values": ["PROPER_PERSON", "CORPORATE", "TRUST", "FOHF"]
         },
         "domicile": {
           "name": "domicile",
@@ -316,7 +316,7 @@ Executes a validated DSL operation (placeholder for future implementation).
 **Request Body:**
 ```json
 {
-  "dsl": "(investor.start-opportunity :legal-name \"Test\" :type \"INDIVIDUAL\")",
+  "dsl": "(investor.start-opportunity :legal-name \"Test\" :type \"PROPER_PERSON\")",
   "domain": "hedge-fund-investor",
   "session_id": "optional-session-id"
 }

@@ -138,12 +138,12 @@ func GenerateUBOAttributes() []dictionary.Attribute {
 		// =============================================================================
 		{
 			AttributeID:     uuid.New().String(),
-			Name:            "ubo.natural_person_id",
+			Name:            "ubo.natural_proper_person_id",
 			LongDescription: "Unique identifier for the natural person who is a UBO",
 			GroupID:         "ubo_identification",
 			Mask:            "UUID",
 			Domain:          "UBO",
-			Tags:            []string{"UBO", "IDENTITY", "NATURAL_PERSON"},
+			Tags:            []string{"UBO", "IDENTITY", "PROPER_PERSON"},
 			Constraints:     []string{"REQUIRED"},
 			Source: dictionary.SourceMetadata{
 				Primary: "UBO_IDENTIFICATION_PROCESS",
@@ -432,12 +432,12 @@ func GenerateUBOAttributes() []dictionary.Attribute {
 		{
 			AttributeID:     uuid.New().String(),
 			Name:            "trust.trustee_type",
-			LongDescription: "Type of trustee (individual or corporate)",
+			LongDescription: "Type of trustee (proper person or corporate)",
 			GroupID:         "trust_parties",
 			Mask:            "ENUM",
 			Domain:          "UBO",
 			Tags:            []string{"TRUST", "TRUSTEE", "CLASSIFICATION"},
-			Constraints:     []string{"REQUIRED", "ENUM:INDIVIDUAL_TRUSTEE,CORPORATE_TRUSTEE,PROFESSIONAL_TRUSTEE"},
+			Constraints:     []string{"REQUIRED", "ENUM:PROPER_PERSON_TRUSTEE,CORPORATE_TRUSTEE,PROFESSIONAL_TRUSTEE"},
 			Source: dictionary.SourceMetadata{
 				Primary: "TRUST_DEED",
 			},
@@ -448,7 +448,7 @@ func GenerateUBOAttributes() []dictionary.Attribute {
 		{
 			AttributeID:     uuid.New().String(),
 			Name:            "trust.beneficiary_type",
-			LongDescription: "Type of beneficiary (named individual or class)",
+			LongDescription: "Type of beneficiary (named proper person or class)",
 			GroupID:         "trust_parties",
 			Mask:            "ENUM",
 			Domain:          "UBO",
@@ -636,7 +636,7 @@ func GenerateUBOAttributes() []dictionary.Attribute {
 		{
 			AttributeID:     uuid.New().String(),
 			Name:            "fincen.control_selection_method",
-			LongDescription: "Method used to select single individual under FinCEN Control Prong",
+			LongDescription: "Method used to select single proper person under FinCEN Control Prong",
 			GroupID:         "fincen_control_prong",
 			Mask:            "ENUM",
 			Domain:          "UBO",
@@ -684,11 +684,11 @@ func GenerateUBOAttributes() []dictionary.Attribute {
 		{
 			AttributeID:     uuid.New().String(),
 			Name:            "fincen.single_individual_selected",
-			LongDescription: "Boolean indicating compliance with FinCEN single individual requirement",
+			LongDescription: "Boolean indicating compliance with FinCEN single proper person requirement",
 			GroupID:         "fincen_control_prong",
 			Mask:            "BOOLEAN",
 			Domain:          "UBO",
-			Tags:            []string{"FINCEN", "SINGLE_INDIVIDUAL", "COMPLIANCE"},
+			Tags:            []string{"FINCEN", "SINGLE_PROPER_PERSON", "COMPLIANCE"},
 			Constraints:     []string{"REQUIRED"},
 			Source: dictionary.SourceMetadata{
 				Primary: "FINCEN_COMPLIANCE_CHECK",

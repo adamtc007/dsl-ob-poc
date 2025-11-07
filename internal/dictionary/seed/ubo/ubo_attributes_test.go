@@ -105,7 +105,7 @@ func TestGenerateUBOAttributes(t *testing.T) {
 		"entity.type",
 		"ownership.percentage",
 		"ownership.link_type",
-		"ubo.natural_person_id",
+		"ubo.natural_proper_person_id",
 		"ubo.relationship_type",
 		"ubo.total_ownership",
 		"ubo.verification_status",
@@ -165,10 +165,10 @@ func TestUBOAttributeSpecificValidation(t *testing.T) {
 			}
 			assert.True(t, hasMinMax, "ownership.percentage should have min/max constraints")
 
-		case "ubo.natural_person_id":
+		case "ubo.natural_proper_person_id":
 			// Should be UUID type
-			assert.Equal(t, "UUID", attr.Mask, "ubo.natural_person_id should be UUID type")
-			assert.Contains(t, attr.Constraints, "REQUIRED", "ubo.natural_person_id should be required")
+			assert.Equal(t, "UUID", attr.Mask, "ubo.natural_proper_person_id should be UUID type")
+			assert.Contains(t, attr.Constraints, "REQUIRED", "ubo.natural_proper_person_id should be required")
 
 		case "ubo.verification_status":
 			// Should have specific enum values for verification status
@@ -218,7 +218,7 @@ func TestUBOAttributeSpecificValidation(t *testing.T) {
 			for _, constraint := range attr.Constraints {
 				if len(constraint) > 5 && constraint[:5] == "ENUM:" {
 					hasTrusteeEnum = true
-					assert.Contains(t, constraint, "INDIVIDUAL_TRUSTEE", "Should include INDIVIDUAL_TRUSTEE")
+					assert.Contains(t, constraint, "PROPER_PERSON_TRUSTEE", "Should include PROPER_PERSON_TRUSTEE")
 					assert.Contains(t, constraint, "CORPORATE_TRUSTEE", "Should include CORPORATE_TRUSTEE")
 					break
 				}
@@ -312,7 +312,7 @@ func TestUBOAttributeMetadata(t *testing.T) {
 			assert.Contains(t, []string{
 				"ENTITY", "IDENTITY", "LEGAL", "GEOGRAPHIC", "CLASSIFICATION",
 				"OWNERSHIP", "PERCENTAGE", "VOTING", "CONTROL", "UBO",
-				"NATURAL_PERSON", "RELATIONSHIP", "THRESHOLD", "CONFIGURATION",
+				"PROPER_PERSON", "RELATIONSHIP", "THRESHOLD", "CONFIGURATION",
 				"CALCULATED", "VERIFICATION", "STATUS", "DOCUMENTS", "PII",
 				"SCREENING", "COMPLIANCE", "HIGH_RISK", "PEP", "SANCTIONS",
 				"LEGAL_RISK", "RISK", "ASSESSMENT", "MEDIA", "REPUTATIONAL_RISK",
@@ -326,9 +326,9 @@ func TestUBOAttributeMetadata(t *testing.T) {
 				"PARTNERSHIP", "PARTNER", "CAPITAL", "FINANCIAL", "MECHANISM",
 				"PRONG", "WORKFLOW", "TYPE", "FRAMEWORK", "RECURSIVE", "DEPTH",
 				// FinCEN-specific tags
-				"FINCEN", "TITLE", "SELECTION", "PRIORITY", "FUNCTIONS", "INDIVIDUAL",
+				"FINCEN", "TITLE", "SELECTION", "PRIORITY", "FUNCTIONS", "PROPER_PERSON",
 				"DECISION", "RATIONALE", "CITATION", "AUDIT", "SIGNIFICANT_RESPONSIBILITY",
-				"SIMILAR_FUNCTIONS", "METHOD", "RANK", "PERFORMED", "SINGLE_INDIVIDUAL",
+				"SIMILAR_FUNCTIONS", "METHOD", "RANK", "PERFORMED", "SINGLE_PROPER_PERSON",
 			}, tag, "Tag should be from expected UBO tag vocabulary: %s", tag)
 		}
 	}

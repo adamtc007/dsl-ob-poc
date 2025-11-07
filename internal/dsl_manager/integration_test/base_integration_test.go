@@ -93,7 +93,7 @@ func GenerateTestDomains() []TestDomain {
 				State string
 				DSL   string
 			}{
-				{State: "CREATED", DSL: "(investor.create (name \"Test Investor\") (type \"INDIVIDUAL\"))"},
+				{State: "CREATED", DSL: "(investor.create (name \"Test Investor\") (type \"PROPER_PERSON\"))"},
 				{State: "KYC_STARTED", DSL: "(kyc.start (document \"Passport\") (jurisdiction \"US\"))"},
 				{State: "KYC_COMPLETED", DSL: "(kyc.complete (risk-rating \"LOW\"))"},
 				{State: "PRODUCTS_ADDED", DSL: "(products.add \"CUSTODY\" \"REPORTING\")"},
