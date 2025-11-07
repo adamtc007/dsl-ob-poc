@@ -24,7 +24,7 @@ fi
 # Backup function
 backup_file() {
     local file="$1"
-    if [[ -f "$file" ]]; then
+    if [[ -f "$file" && "$CREATE_BACKUPS" == "true" ]]; then
         cp "$file" "$file.backup.$(date +%Y%m%d_%H%M%S)"
         echo -e "${BLUE}📝 Backed up: $file${NC}"
     fi
@@ -234,6 +234,11 @@ const EntityTypeIndividual = EntityTypeProperPerson
 # Main execution
 main() {
     echo -e "${BLUE}Starting refactoring process...${NC}"
+    if [[ "$CREATE_BACKUPS" == "true" ]]; then
+        echo -e "${YELLOW}📁 Creating backup files for safety${NC}"
+    else
+        echo -e "${YELLOW}⚠️  No backup files will be created${NC}"
+    fi
     echo ""
 
     # 1. SQL files (database schema)
@@ -273,10 +278,22 @@ main() {
     echo "4. Update any hardcoded strings in external configuration"
     echo "5. Review and commit changes"
     echo ""
-    echo -e "${BLUE}💡 Note: Backup files (.backup.*) have been created for all modified files${NC}"
+    if [[ "$CREATE_BACKUPS" == "true" ]]; then
+        echo -e "${BLUE}💡 Note: Backup files (.backup.*) have been created for all modified files${NC}"
+        echo -e "${BLUE}    You can clean them up with: find . -name '*.backup.*' -delete${NC}"
+    fi
     echo ""
     echo -e "${RED}⚠️  Important: Review all changes before committing!${NC}"
 }
+
+# Set backup preference (default: false to reduce clutter)
+CREATE_BACKUPS="${CREATE_BACKUPS:-false}"
+
+# Check for backup flag
+if [[ "$1" == "--with-backups" ]]; then
+    CREATE_BACKUPS="true"
+    shift
+fi
 
 # Check for dry run mode
 if [[ "$1" == "--dry-run" ]]; then
@@ -294,7 +311,11 @@ fi
 # Confirm before proceeding
 if [[ "$1" != "--yes" ]]; then
     echo -e "${YELLOW}⚠️  This will modify many files in the project.${NC}"
-    echo -e "${YELLOW}   Backup files will be created automatically.${NC}"
+    if [[ "$CREATE_BACKUPS" == "true" ]]; then
+        echo -e "${YELLOW}   Backup files will be created automatically.${NC}"
+    else
+        echo -e "${YELLOW}   No backup files will be created (use --with-backups to enable).${NC}"
+    fi
     echo ""
     read -p "Continue with refactoring? (y/N): " -n 1 -r
     echo ""
