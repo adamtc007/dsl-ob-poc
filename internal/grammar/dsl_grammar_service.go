@@ -10,8 +10,7 @@ import (
 
 // DSLGrammarService provides DSL grammar management and validation
 type DSLGrammarService struct {
-	repo   vocabulary.GrammarRepository
-	parser *EBNFParser
+	repo vocabulary.GrammarRepository
 }
 
 // NewDSLGrammarService creates a new DSL grammar service

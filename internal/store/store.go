@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -90,13 +91,13 @@ type ProdResource struct {
 
 // Attribute represents an attribute in the dictionary (v3 schema).
 type Attribute struct {
-	AttributeID     string             `json:"attribute_id"`
-	Name            string             `json:"name"`
-	LongDescription string             `json:"long_description"`
-	GroupID         string             `json:"group_id"`
-	Mask            string             `json:"mask"`
-	Domain          string             `json:"domain"`
-	Vector          string             `json:"vector"`
+	AttributeID     string              `json:"attribute_id"`
+	Name            string              `json:"name"`
+	LongDescription string              `json:"long_description"`
+	GroupID         string              `json:"group_id"`
+	Mask            string              `json:"mask"`
+	Domain          string              `json:"domain"`
+	Vector          string              `json:"vector"`
 	Source          JSONBSourceMetadata `json:"source"` // Structured JSONB
 	Sink            JSONBSinkMetadata   `json:"sink"`   // Structured JSONB
 }
@@ -156,15 +157,15 @@ type Partnership struct {
 
 // Individual represents an individual (proper person) entity.
 type Individual struct {
-	ProperProperPersonID     string     `json:"proper_proper_person_id"`
-	FirstName        string     `json:"first_name"`
-	LastName         string     `json:"last_name"`
-	MiddleNames      string     `json:"middle_names"`
-	DateOfBirth      *time.Time `json:"date_of_birth"`
-	Nationality      string     `json:"nationality"`
-	ResidenceAddress string     `json:"residence_address"`
-	IDDocumentType   string     `json:"id_document_type"`
-	IDDocumentNumber string     `json:"id_document_number"`
+	ProperProperPersonID string     `json:"proper_proper_person_id"`
+	FirstName            string     `json:"first_name"`
+	LastName             string     `json:"last_name"`
+	MiddleNames          string     `json:"middle_names"`
+	DateOfBirth          *time.Time `json:"date_of_birth"`
+	Nationality          string     `json:"nationality"`
+	ResidenceAddress     string     `json:"residence_address"`
+	IDDocumentType       string     `json:"id_document_type"`
+	IDDocumentNumber     string     `json:"id_document_number"`
 }
 
 // NewStore creates a new Store instance and opens a database connection.
@@ -846,7 +847,7 @@ func (s *Store) LoadOrchestrationSession(ctx context.Context, sessionID string) 
 		&session.LastUsed,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("orchestration session not found: %s", sessionID)
 		}
 		return nil, fmt.Errorf("failed to load orchestration session: %w", err)

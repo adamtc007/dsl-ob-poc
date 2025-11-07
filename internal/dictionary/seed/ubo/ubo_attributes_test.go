@@ -64,8 +64,8 @@ func TestGenerateUBOAttributes(t *testing.T) {
 					hasRequirementConstraint = true
 				}
 				if strings.Contains(constraint, "MIN") || strings.Contains(constraint, "MAX") ||
-				   strings.Contains(constraint, "LENGTH") || strings.Contains(constraint, "DEFAULT") ||
-				   strings.Contains(constraint, "PRECISION") {
+					strings.Contains(constraint, "LENGTH") || strings.Contains(constraint, "DEFAULT") ||
+					strings.Contains(constraint, "PRECISION") {
 					hasValidationConstraint = true
 				}
 			}

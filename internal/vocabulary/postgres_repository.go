@@ -583,7 +583,7 @@ func (r *PostgresRepository) GetVerbRegistry(ctx context.Context, verb string) (
 		WHERE verb = $1`
 
 	err := r.getContext(ctx, &registry, query, verb)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("verb registry not found: %s", verb)
 	}
 	if err != nil {
