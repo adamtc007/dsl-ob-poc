@@ -29,7 +29,51 @@ import (
 	"strings"
 	"time"
 
+	"dsl-ob-poc/internal/dictionary/repository"
 	registry "dsl-ob-poc/internal/domain-registry"
+)
+
+// Attribute UUID Constants - Real UUIDs from seeded dictionary
+const (
+	// Core Onboarding Attributes
+	AttrOnboardCBUID         = "123e4567-e89b-12d3-a456-426614174001" // onboard.cbu_id
+	AttrOnboardNaturePurpose = "123e4567-e89b-12d3-a456-426614174002" // onboard.nature_purpose
+	AttrOnboardStatus        = "123e4567-e89b-12d3-a456-426614174003" // onboard.status
+
+	// Entity Attributes
+	AttrEntityType               = "987fcdeb-51a2-43f7-8765-ba9876543202" // entity.type
+	AttrEntityIncorporationDate  = "987fcdeb-51a2-43f7-8765-ba9876543204" // entity.incorporation_date
+	AttrEntityRegistrationNumber = "987fcdeb-51a2-43f7-8765-ba9876543205" // entity.registration_number
+
+	// Custody Attributes
+	AttrCustodyAccountNumber = "456789ab-cdef-1234-5678-9abcdef01301" // custody.account_number
+	AttrCustodyCustodianName = "456789ab-cdef-1234-5678-9abcdef01302" // custody.custodian_name
+	AttrCustodyAccountType   = "456789ab-cdef-1234-5678-9abcdef01303" // custody.account_type
+
+	// Fund Accounting Attributes
+	AttrAccountingFundCode = "456789ab-cdef-1234-5678-9abcdef01401" // accounting.fund_code
+	AttrAccountingNAVValue = "456789ab-cdef-1234-5678-9abcdef01402" // accounting.nav_value
+
+	// Resource Management Attributes
+	AttrResourceCustodyAccountID = "24681357-9bdf-ace0-2468-13579bdfabc1" // resource.custody_account_id
+	AttrResourceFundAccountingID = "24681357-9bdf-ace0-2468-13579bdfabc2" // resource.fund_accounting_id
+	AttrResourceTransferAgencyID = "24681357-9bdf-ace0-2468-13579bdfabc3" // resource.transfer_agency_id
+	AttrResourceRiskSystemID     = "24681357-9bdf-ace0-2468-13579bdfabc4" // resource.risk_system_id
+
+	// Transfer Agency Attributes
+	AttrTAFundIdentifier = "13579bdf-2468-ace0-1357-9bdf2468abc1" // transfer_agency.fund_identifier
+	AttrTAShareClass     = "13579bdf-2468-ace0-1357-9bdf2468abc2" // transfer_agency.share_class
+
+	// Fund Attributes
+	AttrFundName          = "fedcba98-7654-3210-fedc-ba9876543201" // fund.name
+	AttrFundStrategy      = "fedcba98-7654-3210-fedc-ba9876543202" // fund.strategy
+	AttrFundBaseCurrency  = "fedcba98-7654-3210-fedc-ba9876543203" // fund.base_currency
+	AttrFundMinInvestment = "fedcba98-7654-3210-fedc-ba9876543204" // fund.minimum_investment
+
+	// Document Attributes
+	AttrDocCertificateOfIncorporation = "abcdef12-3456-7890-abcd-ef1234567801" // document.certificate_of_incorporation
+	AttrDocArticlesOfAssociation      = "abcdef12-3456-7890-abcd-ef1234567802" // document.articles_of_association
+	AttrDocBoardResolution            = "abcdef12-3456-7890-abcd-ef1234567803" // document.board_resolution
 )
 
 const (
@@ -45,16 +89,23 @@ type Domain struct {
 	healthy     bool
 	metrics     *registry.DomainMetrics
 	createdAt   time.Time
+	dictRepo    repository.DictionaryRepository
 }
 
 // NewDomain creates a new onboarding domain
 func NewDomain() *Domain {
+	return NewDomainWithDictionary(nil)
+}
+
+// NewDomainWithDictionary creates a new onboarding domain with dictionary repository
+func NewDomainWithDictionary(dictRepo repository.DictionaryRepository) *Domain {
 	domain := &Domain{
 		name:        "onboarding",
 		version:     "1.0.0",
 		description: "Client onboarding lifecycle management from case creation to completion",
 		healthy:     true,
 		createdAt:   time.Now(),
+		dictRepo:    dictRepo,
 	}
 
 	domain.vocabulary = domain.buildVocabulary()
@@ -268,10 +319,31 @@ func (d *Domain) GenerateDSL(ctx context.Context, req *registry.GenerationReques
 		dsl = "(services.discover (for.product \"CUSTODY\" (service \"AccountOpening\") (service \"TradeSettlement\")))"
 
 	case strings.Contains(instruction, "plan resources"):
-		dsl = "(resources.plan (resource.create \"CustodyAccount\" (owner \"CustodyTech\") (var (attr-id \"attr-001\"))))"
+		dsl = fmt.Sprintf(`(resources.plan
+  (resource.create "CustodyAccount"
+    (owner "CustodyTech")
+    @attr{%s:custody.account_number}
+    @attr{%s:custody.account_type}
+  )
+  (resource.create "FundAccountingSystem"
+    (owner "AccountingTech")
+    @attr{%s:accounting.fund_code}
+    @attr{%s:fund.base_currency}
+  )
+  (resource.create "TransferAgencySystem"
+    (owner "TransferTech")
+    @attr{%s:transfer_agency.fund_identifier}
+    @attr{%s:transfer_agency.share_class}
+  )
+)`, AttrCustodyAccountNumber, AttrCustodyAccountType, AttrAccountingFundCode, AttrFundBaseCurrency, AttrTAFundIdentifier, AttrTAShareClass)
 
 	case strings.Contains(instruction, "bind attributes"):
-		dsl = "(values.bind (bind (attr-id \"attr-001\") (value \"CUST-ACC-001\")))"
+		dsl = fmt.Sprintf(`(values.bind
+  @attr{%s:custody.account_number} "CUST-EGOF-001"
+  @attr{%s:accounting.fund_code} "FA-EGOF-LU-001"
+  @attr{%s:transfer_agency.fund_identifier} "TA-EGOF-LU"
+  @attr{%s:fund.base_currency} "EUR"
+)`, AttrCustodyAccountNumber, AttrAccountingFundCode, AttrTAFundIdentifier, AttrFundBaseCurrency)
 
 	case strings.Contains(instruction, "workflow transition"):
 		from := "CREATE"
@@ -1038,7 +1110,7 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 			FromStates: []string{"SERVICES_DISCOVERED"},
 			ToState:    "RESOURCES_PLANNED",
 		},
-		Examples:  []string{`(resources.plan (resource.create "CustodyAccount" (owner "CustodyTech") (var (attr-id "attr-uuid"))))`},
+		Examples:  []string{fmt.Sprintf(`(resources.plan (resource.create "CustodyAccount" (owner "CustodyTech") @attr{%s:custody.account_number} @attr{%s:custody.account_type}))`, AttrCustodyAccountNumber, AttrCustodyAccountType)},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -1157,7 +1229,7 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 				EnumValues:  []string{"STRING", "INTEGER", "DECIMAL", "DATE", "BOOLEAN", "UUID", "ENUM"},
 			},
 		},
-		Examples:  []string{`(attributes.define (attr.id "attr-uuid") (type "STRING"))`},
+		Examples:  []string{fmt.Sprintf(`(attributes.define @attr{%s:onboard.nature_purpose} (type "STRING"))`, AttrOnboardNaturePurpose)},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -1176,7 +1248,7 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 				Description: "Data source UUID",
 			},
 		},
-		Examples:  []string{`(attributes.resolve (attr.id "attr-uuid") (source.id "src-uuid"))`},
+		Examples:  []string{fmt.Sprintf(`(attributes.resolve @attr{%s:onboard.nature_purpose} (source.id "src-uuid"))`, AttrOnboardNaturePurpose)},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -1198,7 +1270,7 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 			FromStates: []string{"RESOURCES_PLANNED"},
 			ToState:    "ATTRIBUTES_BOUND",
 		},
-		Examples:  []string{`(values.bind (bind (attr-id "attr-uuid") (value "CUST-ACC-001")))`},
+		Examples:  []string{fmt.Sprintf(`(values.bind @attr{%s:custody.account_number} "CUST-ACC-001" @attr{%s:accounting.fund_code} "FA-FUND-001")`, AttrCustodyAccountNumber, AttrAccountingFundCode)},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -1217,7 +1289,7 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 				Description: "Validation rule UUID",
 			},
 		},
-		Examples:  []string{`(values.validate (attr.id "attr-uuid") (rule.id "rule-uuid"))`},
+		Examples:  []string{fmt.Sprintf(`(values.validate @attr{%s:custody.account_number} (rule.id "rule-uuid"))`, AttrCustodyAccountNumber)},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -1236,7 +1308,7 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 				Description: "Encryption key UUID",
 			},
 		},
-		Examples:  []string{`(values.encrypt (attr.id "attr-uuid") (key.id "key-uuid"))`},
+		Examples:  []string{fmt.Sprintf(`(values.encrypt @attr{%s:custody.account_number} (key.id "key-uuid"))`, AttrCustodyAccountNumber)},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -1926,4 +1998,144 @@ func (d *Domain) buildVocabulary() *registry.Vocabulary {
 	}
 
 	return vocab
+}
+
+// =============================================================================
+// Dictionary Integration - AttributeID-as-Type Pattern
+// =============================================================================
+
+// SetDictionaryRepository sets the dictionary repository for attribute resolution
+func (d *Domain) SetDictionaryRepository(repo repository.DictionaryRepository) {
+	d.dictRepo = repo
+}
+
+// ResolveAttributeName resolves a human-readable name from an attribute ID
+func (d *Domain) ResolveAttributeName(ctx context.Context, attrID string) (string, error) {
+	if d.dictRepo == nil {
+		return "", fmt.Errorf("dictionary repository not configured")
+	}
+
+	attr, err := d.dictRepo.GetByID(ctx, attrID)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve attribute %s: %w", attrID, err)
+	}
+
+	return attr.Name, nil
+}
+
+// ResolveAttributesByIDs resolves multiple attribute names from their IDs
+func (d *Domain) ResolveAttributesByIDs(ctx context.Context, attrIDs []string) (map[string]string, error) {
+	if d.dictRepo == nil {
+		return nil, fmt.Errorf("dictionary repository not configured")
+	}
+
+	result := make(map[string]string)
+	for _, attrID := range attrIDs {
+		name, err := d.ResolveAttributeName(ctx, attrID)
+		if err != nil {
+			// Log error but continue with other attributes
+			result[attrID] = attrID // Use ID as fallback
+		} else {
+			result[attrID] = name
+		}
+	}
+
+	return result, nil
+}
+
+// EnhanceDSLWithAttributeNames takes DSL with @attr{uuid} and adds human-readable names
+// Returns DSL with @attr{uuid:name} format for better readability
+func (d *Domain) EnhanceDSLWithAttributeNames(ctx context.Context, dsl string) (string, error) {
+	if d.dictRepo == nil {
+		return dsl, nil // Return original if no dictionary configured
+	}
+
+	// Parse DSL to extract attribute IDs
+	parser := func() ([]string, error) {
+		attrPattern := regexp.MustCompile(`@attr\{([a-fA-F0-9-]{8,36})(?::([^}]+))?\}`)
+		matches := attrPattern.FindAllStringSubmatch(dsl, -1)
+
+		var attrIDs []string
+		for _, match := range matches {
+			if len(match) >= 2 {
+				attrID := match[1]
+				// Only collect IDs that don't already have names
+				if len(match) < 3 || match[2] == "" {
+					attrIDs = append(attrIDs, attrID)
+				}
+			}
+		}
+		return attrIDs, nil
+	}
+
+	attrIDs, err := parser()
+	if err != nil {
+		return dsl, fmt.Errorf("failed to parse attribute IDs: %w", err)
+	}
+
+	if len(attrIDs) == 0 {
+		return dsl, nil // No attributes to resolve
+	}
+
+	// Resolve names for all attribute IDs
+	nameMap, err := d.ResolveAttributesByIDs(ctx, attrIDs)
+	if err != nil {
+		return dsl, fmt.Errorf("failed to resolve attribute names: %w", err)
+	}
+
+	// Replace @attr{uuid} with @attr{uuid:name} in DSL
+	enhanced := dsl
+	uuidPattern := regexp.MustCompile(`@attr\{([a-fA-F0-9-]{8,36})\}`)
+	enhanced = uuidPattern.ReplaceAllStringFunc(enhanced, func(match string) string {
+		// Extract UUID from match using capture group
+		matches := uuidPattern.FindStringSubmatch(match)
+		if len(matches) >= 2 {
+			uuid := matches[1]
+			if name, exists := nameMap[uuid]; exists && name != uuid {
+				return fmt.Sprintf("@attr{%s:%s}", uuid, name)
+			}
+		}
+		return match // Return original if name not found
+	})
+
+	return enhanced, nil
+}
+
+// GenerateAttributeReference creates a properly formatted @attr{uuid:name} reference
+func (d *Domain) GenerateAttributeReference(ctx context.Context, attrID string) (string, error) {
+	if attrID == "" {
+		return "", fmt.Errorf("attribute ID cannot be empty")
+	}
+
+	// Try to resolve the name
+	if d.dictRepo != nil {
+		if name, err := d.ResolveAttributeName(ctx, attrID); err == nil {
+			return fmt.Sprintf("@attr{%s:%s}", attrID, name), nil
+		}
+	}
+
+	// Fallback to UUID only
+	return fmt.Sprintf("@attr{%s}", attrID), nil
+}
+
+// ValidateAttributeReferences ensures all @attr{} references in DSL are valid
+func (d *Domain) ValidateAttributeReferences(ctx context.Context, dsl string) error {
+	if d.dictRepo == nil {
+		return nil // Skip validation if no dictionary configured
+	}
+
+	attrPattern := regexp.MustCompile(`@attr\{([a-fA-F0-9-]{8,36})(?::([^}]+))?\}`)
+	matches := attrPattern.FindAllStringSubmatch(dsl, -1)
+
+	for _, match := range matches {
+		if len(match) >= 2 {
+			attrID := match[1]
+			_, err := d.dictRepo.GetByID(ctx, attrID)
+			if err != nil {
+				return fmt.Errorf("invalid attribute reference @attr{%s}: %w", attrID, err)
+			}
+		}
+	}
+
+	return nil
 }

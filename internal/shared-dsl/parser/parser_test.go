@@ -1146,3 +1146,317 @@ func TestDebug_AttributeIDStructure(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// AttributeID-as-Type Pattern Tests - @attr{uuid:name} syntax
+// =============================================================================
+
+func TestParse_AttributeUUIDOnly(t *testing.T) {
+	dsl := `(case.create @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f})`
+
+	ast, err := Parse(dsl)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Verify AST structure
+	if ast.Root.Type != RootNode {
+		t.Errorf("Expected RootNode, got %v", ast.Root.Type)
+	}
+
+	if len(ast.Root.Children) != 1 {
+		t.Errorf("Expected 1 expression, got %d", len(ast.Root.Children))
+	}
+
+	expr := ast.Root.Children[0]
+	if expr.Type != ExpressionNode {
+		t.Errorf("Expected ExpressionNode, got %v", expr.Type)
+	}
+
+	if len(expr.Children) != 2 {
+		t.Errorf("Expected 2 children (verb + attribute), got %d", len(expr.Children))
+	}
+
+	// Check attribute node
+	attrNode := expr.Children[1]
+	if attrNode.Type != AttributeNode {
+		t.Errorf("Expected AttributeNode, got %v", attrNode.Type)
+	}
+
+	expectedID := "8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f"
+	if attrNode.AttributeID != expectedID {
+		t.Errorf("Expected AttributeID %s, got %s", expectedID, attrNode.AttributeID)
+	}
+
+	if attrNode.Name != "" {
+		t.Errorf("Expected empty Name, got %s", attrNode.Name)
+	}
+
+	expectedValue := "@attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f}"
+	if attrNode.Value != expectedValue {
+		t.Errorf("Expected Value %s, got %s", expectedValue, attrNode.Value)
+	}
+}
+
+func TestParse_AttributeUUIDWithName(t *testing.T) {
+	dsl := `(kyc.start @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f:custody.account_number})`
+
+	ast, err := Parse(dsl)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	expr := ast.Root.Children[0]
+	attrNode := expr.Children[1]
+
+	if attrNode.Type != AttributeNode {
+		t.Errorf("Expected AttributeNode, got %v", attrNode.Type)
+	}
+
+	expectedID := "8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f"
+	if attrNode.AttributeID != expectedID {
+		t.Errorf("Expected AttributeID %s, got %s", expectedID, attrNode.AttributeID)
+	}
+
+	expectedName := "custody.account_number"
+	if attrNode.Name != expectedName {
+		t.Errorf("Expected Name %s, got %s", expectedName, attrNode.Name)
+	}
+
+	expectedValue := "@attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f:custody.account_number}"
+	if attrNode.Value != expectedValue {
+		t.Errorf("Expected Value %s, got %s", expectedValue, attrNode.Value)
+	}
+}
+
+func TestParse_MultipleAttributes(t *testing.T) {
+	dsl := `(investor.start-opportunity
+  @attr{a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d:investor.legal_name}
+  @attr{e5f6a7b8-c9d0-e1f2-a3b4-c5d6e7f8a9b0:investor.type}
+  @attr{c9d0e1f2-a3b4-c5d6-e7f8-a9b0c1d2e3f4}
+)`
+
+	ast, err := Parse(dsl)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	expr := ast.Root.Children[0]
+	if len(expr.Children) != 4 { // verb + 3 attributes
+		t.Errorf("Expected 4 children, got %d", len(expr.Children))
+	}
+
+	// Check first attribute (with name)
+	attr1 := expr.Children[1]
+	if attr1.Type != AttributeNode {
+		t.Errorf("Expected AttributeNode, got %v", attr1.Type)
+	}
+	if attr1.AttributeID != "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" {
+		t.Errorf("Wrong AttributeID for first attribute")
+	}
+	if attr1.Name != "investor.legal_name" {
+		t.Errorf("Wrong Name for first attribute")
+	}
+
+	// Check third attribute (UUID only)
+	attr3 := expr.Children[3]
+	if attr3.Type != AttributeNode {
+		t.Errorf("Expected AttributeNode, got %v", attr3.Type)
+	}
+	if attr3.Name != "" {
+		t.Errorf("Expected empty Name for third attribute, got %s", attr3.Name)
+	}
+}
+
+func TestAST_ExtractAttributes(t *testing.T) {
+	dsl := `(investor.start-opportunity
+  @attr{a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d:investor.legal_name}
+  @attr{e5f6a7b8-c9d0-e1f2-a3b4-c5d6e7f8a9b0:investor.type}
+  @attr{c9d0e1f2-a3b4-c5d6-e7f8-a9b0c1d2e3f4}
+)`
+
+	ast, err := Parse(dsl)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	attributes := ast.ExtractAttributes()
+	if len(attributes) != 3 {
+		t.Errorf("Expected 3 attributes, got %d", len(attributes))
+	}
+
+	// Check first attribute
+	attr0 := attributes[0]
+	if attr0.ID != "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" {
+		t.Errorf("Wrong ID for first attribute")
+	}
+	if attr0.Name != "investor.legal_name" {
+		t.Errorf("Wrong Name for first attribute")
+	}
+
+	// Check third attribute (UUID only)
+	attr2 := attributes[2]
+	if attr2.ID != "c9d0e1f2-a3b4-c5d6-e7f8-a9b0c1d2e3f4" {
+		t.Errorf("Wrong ID for third attribute")
+	}
+	if attr2.Name != "" {
+		t.Errorf("Expected empty Name for third attribute, got %s", attr2.Name)
+	}
+}
+
+func TestAST_ExtractAttributeIDs_NewSyntax(t *testing.T) {
+	dsl := `(resources.plan
+  (resource.create "CustodyAccount" @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f:custody.account_number})
+  (resource.create "AccountingSystem" @attr{2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f})
+)`
+
+	ast, err := Parse(dsl)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	attrIDs := ast.ExtractAttributeIDs()
+	expected := []string{
+		"8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f",
+		"2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
+	}
+
+	if len(attrIDs) != len(expected) {
+		t.Errorf("Expected %d attribute IDs, got %d", len(expected), len(attrIDs))
+	}
+
+	for i, expectedID := range expected {
+		if i >= len(attrIDs) || attrIDs[i] != expectedID {
+			t.Errorf("Expected attribute ID %s at position %d, got %v", expectedID, i, attrIDs)
+		}
+	}
+}
+
+func TestAST_ExtractAttributeIDs_MixedSyntax(t *testing.T) {
+	dsl := `(resources.plan
+  (resource.create "CustodyAccount"
+    (var (attr-id "legacy-uuid-1"))
+    @attr{new-uuid-1:account.number}
+  )
+  (values.bind
+    (bind (attr-id "legacy-uuid-2") (value "CUST-001"))
+    @attr{new-uuid-2}
+  )
+)`
+
+	ast, err := Parse(dsl)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	attrIDs := ast.ExtractAttributeIDs()
+	expectedCount := 4 // 2 legacy + 2 new syntax
+	if len(attrIDs) != expectedCount {
+		t.Errorf("Expected %d attribute IDs, got %d: %v", expectedCount, len(attrIDs), attrIDs)
+	}
+
+	// Should contain both legacy and new syntax IDs
+	hasLegacy1 := false
+	hasLegacy2 := false
+	hasNew1 := false
+	hasNew2 := false
+
+	for _, id := range attrIDs {
+		switch id {
+		case "legacy-uuid-1":
+			hasLegacy1 = true
+		case "legacy-uuid-2":
+			hasLegacy2 = true
+		case "new-uuid-1":
+			hasNew1 = true
+		case "new-uuid-2":
+			hasNew2 = true
+		}
+	}
+
+	if !hasLegacy1 || !hasLegacy2 || !hasNew1 || !hasNew2 {
+		t.Errorf("Missing expected attribute IDs. Got: %v", attrIDs)
+	}
+}
+
+func TestParse_AttributeMalformed(t *testing.T) {
+	testCases := []struct {
+		name string
+		dsl  string
+	}{
+		{"Missing attr", `(case.create @{uuid})`},
+		{"Missing opening brace", `(case.create @attr uuid)`},
+		{"Missing closing brace", `(case.create @attr{uuid)`},
+		{"Empty attribute", `(case.create @attr{})`},
+		{"Colon but no name", `(case.create @attr{uuid:})`},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Parse(tc.dsl)
+			if err == nil {
+				t.Errorf("Expected parse error for malformed DSL: %s", tc.dsl)
+			}
+		})
+	}
+}
+
+func TestParse_AttributeComplexWorkflow(t *testing.T) {
+	dsl := `(case.create
+  (cbu.id "CBU-2024-001")
+  (nature-purpose "UCITS equity fund")
+)
+
+(kyc.start
+  @attr{a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d:investor.legal_name}
+  @attr{e5f6a7b8-c9d0-e1f2-a3b4-c5d6e7f8a9b0:investor.type}
+)
+
+(resources.plan
+  (resource.create "CustodyAccount"
+    (owner "CustodyTech")
+    @attr{8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f:custody.account_number}
+  )
+)`
+
+	ast, err := Parse(dsl)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should have 3 top-level expressions
+	if len(ast.Root.Children) != 3 {
+		t.Errorf("Expected 3 expressions, got %d", len(ast.Root.Children))
+	}
+
+	// Extract attributes
+	attributes := ast.ExtractAttributes()
+	if len(attributes) != 3 {
+		t.Errorf("Expected 3 attributes, got %d", len(attributes))
+	}
+
+	// Verify attribute extraction
+	attrIDs := ast.ExtractAttributeIDs()
+	expectedIDs := []string{
+		"a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+		"e5f6a7b8-c9d0-e1f2-a3b4-c5d6e7f8a9b0",
+		"8a5d1a77-e4b3-4c2d-9f1e-7a8b9c0d1e2f",
+	}
+
+	if len(attrIDs) != len(expectedIDs) {
+		t.Errorf("Expected %d attribute IDs, got %d", len(expectedIDs), len(attrIDs))
+	}
+
+	for _, expectedID := range expectedIDs {
+		found := false
+		for _, actualID := range attrIDs {
+			if actualID == expectedID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Missing expected attribute ID: %s", expectedID)
+		}
+	}
+}

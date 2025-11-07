@@ -2,8 +2,14 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"dsl-ob-poc/internal/dictionary"
+)
+
+// Common errors
+var (
+	ErrAttributeNotFound = errors.New("attribute not found")
 )
 
 // ListOptions provides flexible filtering for dictionary attributes

@@ -3,7 +3,8 @@
 
 INSERT INTO "dsl-ob-poc".dictionary (attribute_id, name, long_description, group_id, mask, domain, vector, source, sink, created_at, updated_at) VALUES
 
--- Onboarding Core Attributes (skip onboard.cbu_id as it already exists)
+-- Core Onboarding Attributes (referenced by DSL generation)
+('123e4567-e89b-12d3-a456-426614174001', 'onboard.cbu_id', 'Client Business Unit identifier', 'Onboarding', 'string', 'Onboarding', '', '{"type": "generated", "pattern": "CBU-[0-9]{4}-[0-9]{3}", "required": true}', '{"type": "database", "table": "onboarding_cases"}', NOW(), NOW()),
 ('123e4567-e89b-12d3-a456-426614174002', 'onboard.nature_purpose', 'Nature and purpose of the business relationship', 'Onboarding', 'string', 'Onboarding', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "onboarding_cases"}', NOW(), NOW()),
 ('123e4567-e89b-12d3-a456-426614174003', 'onboard.status', 'Current onboarding status', 'Onboarding', 'enum', 'Onboarding', '', '{"type": "derived", "values": ["PENDING", "IN_PROGRESS", "APPROVED", "REJECTED"]}', '{"type": "database", "table": "onboarding_cases"}', NOW(), NOW()),
 
@@ -55,11 +56,14 @@ INSERT INTO "dsl-ob-poc".dictionary (attribute_id, name, long_description, group
 ('24680ace-1357-9bdf-2468-0ace13579bd1', 'risk.investment_experience', 'Years of investment experience', 'Risk', 'integer', 'Risk', '', '{"type": "manual", "required": true, "validation": "non_negative_integer"}', '{"type": "database", "table": "risk_profiles"}', NOW(), NOW()),
 ('24680ace-1357-9bdf-2468-0ace13579bd2', 'risk.previous_losses', 'Previous investment losses percentage', 'Risk', 'decimal', 'Risk', '', '{"type": "manual", "required": false, "validation": "percentage"}', '{"type": "database", "table": "risk_profiles"}', NOW(), NOW()),
 
--- Custody Attributes (skip custody.account_number as it already exists)
+-- Custody Attributes
+('456789ab-cdef-1234-5678-9abcdef01301', 'custody.account_number', 'Custody account number', 'Custody', 'string', 'Custody', '', '{"type": "generated", "pattern": "CUST-[A-Z0-9]{3}-[0-9]{3}", "required": true}', '{"type": "database", "table": "custody_accounts"}', NOW(), NOW()),
 ('456789ab-cdef-1234-5678-9abcdef01302', 'custody.custodian_name', 'Name of the custodian', 'Custody', 'string', 'Custody', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "custody_accounts"}', NOW(), NOW()),
 ('456789ab-cdef-1234-5678-9abcdef01303', 'custody.account_type', 'Type of custody account', 'Custody', 'enum', 'Custody', '', '{"type": "manual", "required": true, "values": ["SEGREGATED", "OMNIBUS", "PRIME_BROKERAGE"]}', '{"type": "database", "table": "custody_accounts"}', NOW(), NOW()),
 
--- Fund Accounting Attributes (skip accounting.nav_value as it already exists)
+-- Fund Accounting Attributes
+('456789ab-cdef-1234-5678-9abcdef01401', 'accounting.fund_code', 'Fund accounting code', 'Accounting', 'string', 'Accounting', '', '{"type": "generated", "pattern": "FA-[A-Z0-9]{4}-[A-Z]{2}-[0-9]{3}", "required": true}', '{"type": "database", "table": "fund_accounting"}', NOW(), NOW()),
+('456789ab-cdef-1234-5678-9abcdef01402', 'accounting.nav_value', 'Net Asset Value', 'Accounting', 'decimal', 'Accounting', '', '{"type": "calculated", "required": true, "validation": "positive_number"}', '{"type": "database", "table": "fund_accounting"}', NOW(), NOW()),
 ('789abcde-f012-3456-7890-abcdef123502', 'accounting.nav_frequency', 'NAV calculation frequency', 'FundAccounting', 'enum', 'Accounting', '', '{"type": "manual", "required": true, "values": ["DAILY", "WEEKLY", "MONTHLY", "QUARTERLY"]}', '{"type": "database", "table": "nav_calculations"}', NOW(), NOW()),
 ('789abcde-f012-3456-7890-abcdef123503', 'accounting.valuation_point', 'Valuation point time', 'FundAccounting', 'string', 'Accounting', '', '{"type": "manual", "required": true, "format": "HH:MM"}', '{"type": "database", "table": "nav_calculations"}', NOW(), NOW()),
 ('789abcde-f012-3456-7890-abcdef123504', 'accounting.base_currency', 'Base currency for accounting', 'FundAccounting', 'string', 'Accounting', '', '{"type": "manual", "required": true, "format": "ISO-4217"}', '{"type": "database", "table": "fund_accounting"}', NOW(), NOW()),
@@ -74,6 +78,16 @@ INSERT INTO "dsl-ob-poc".dictionary (attribute_id, name, long_description, group
 ('fedcba98-7654-3210-fedc-ba9876543301', 'contact.email', 'Primary email address', 'Contact', 'string', 'Contact', '', '{"type": "manual", "required": true, "format": "email"}', '{"type": "database", "table": "contacts"}', NOW(), NOW()),
 ('fedcba98-7654-3210-fedc-ba9876543302', 'contact.phone', 'Primary phone number', 'Contact', 'string', 'Contact', '', '{"type": "manual", "required": true, "format": "E.164"}', '{"type": "database", "table": "contacts"}', NOW(), NOW()),
 ('fedcba98-7654-3210-fedc-ba9876543303', 'contact.address_line1', 'Address line 1', 'Contact', 'string', 'Contact', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "addresses"}', NOW(), NOW()),
+
+-- Resource Management Attributes
+('24681357-9bdf-ace0-2468-13579bdfabc1', 'resource.custody_account_id', 'Custody account resource identifier', 'Resources', 'string', 'Resources', '', '{"type": "generated", "pattern": "CUST-[A-Z0-9]{8}", "required": true}', '{"type": "database", "table": "resources"}', NOW(), NOW()),
+('24681357-9bdf-ace0-2468-13579bdfabc2', 'resource.fund_accounting_id', 'Fund accounting resource identifier', 'Resources', 'string', 'Resources', '', '{"type": "generated", "pattern": "FA-[A-Z0-9]{8}", "required": true}', '{"type": "database", "table": "resources"}', NOW(), NOW()),
+('24681357-9bdf-ace0-2468-13579bdfabc3', 'resource.transfer_agency_id', 'Transfer agency resource identifier', 'Resources', 'string', 'Resources', '', '{"type": "generated", "pattern": "TA-[A-Z0-9]{8}", "required": true}', '{"type": "database", "table": "resources"}', NOW(), NOW()),
+('24681357-9bdf-ace0-2468-13579bdfabc4', 'resource.risk_system_id', 'Risk management system identifier', 'Resources', 'string', 'Resources', '', '{"type": "generated", "pattern": "RISK-[A-Z0-9]{8}", "required": true}', '{"type": "database", "table": "resources"}', NOW(), NOW()),
+
+-- Transfer Agency Attributes
+('13579bdf-2468-ace0-1357-9bdf2468abc1', 'transfer_agency.fund_identifier', 'Transfer agency fund identifier', 'TransferAgency', 'string', 'TransferAgency', '', '{"type": "generated", "pattern": "TA-[A-Z0-9]{4}-[A-Z]{2}", "required": true}', '{"type": "database", "table": "transfer_agency"}', NOW(), NOW()),
+('13579bdf-2468-ace0-1357-9bdf2468abc2', 'transfer_agency.share_class', 'Share class designation', 'TransferAgency', 'string', 'TransferAgency', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "transfer_agency"}', NOW(), NOW()),
 ('fedcba98-7654-3210-fedc-ba9876543304', 'contact.address_line2', 'Address line 2', 'Contact', 'string', 'Contact', '', '{"type": "manual", "required": false}', '{"type": "database", "table": "addresses"}', NOW(), NOW()),
 ('fedcba98-7654-3210-fedc-ba9876543305', 'contact.city', 'City', 'Contact', 'string', 'Contact', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "addresses"}', NOW(), NOW()),
 ('fedcba98-7654-3210-fedc-ba9876543306', 'contact.postal_code', 'Postal code', 'Contact', 'string', 'Contact', '', '{"type": "manual", "required": true}', '{"type": "database", "table": "addresses"}', NOW(), NOW()),

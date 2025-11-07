@@ -32,6 +32,8 @@ const (
 	NumberNode
 	// BooleanNode is a boolean value
 	BooleanNode
+	// AttributeNode is an attribute reference: @attr{uuid:name} or @attr{uuid}
+	AttributeNode
 )
 
 // String returns the string representation of a NodeType
@@ -51,6 +53,8 @@ func (nt NodeType) String() string {
 		return "Number"
 	case BooleanNode:
 		return "Boolean"
+	case AttributeNode:
+		return "Attribute"
 	default:
 		return "Unknown"
 	}
@@ -58,11 +62,13 @@ func (nt NodeType) String() string {
 
 // Node represents a node in the Abstract Syntax Tree
 type Node struct {
-	Type     NodeType
-	Value    string
-	Children []*Node
-	Line     int // Line number in source DSL (for error reporting)
-	Column   int // Column number in source DSL
+	Type        NodeType
+	Value       string
+	Children    []*Node
+	Line        int    // Line number in source DSL (for error reporting)
+	Column      int    // Column number in source DSL
+	AttributeID string // For AttributeNode: the UUID part
+	Name        string // For AttributeNode: the human-readable name part
 }
 
 // AST represents the Abstract Syntax Tree of parsed DSL
@@ -221,6 +227,11 @@ func (p *Parser) parseArgument() (*Node, error) {
 		return p.parseString()
 	}
 
+	// Attribute reference: @attr{uuid:name} or @attr{uuid}
+	if p.match('@') {
+		return p.parseAttribute()
+	}
+
 	// Number or identifier or boolean
 	if p.isDigit(p.peek()) || p.peek() == '-' {
 		// Could be a number or negative number
@@ -358,6 +369,83 @@ func (p *Parser) readIdentifier() string {
 	return p.input[start:p.pos]
 }
 
+// parseAttribute parses an attribute reference: @attr{uuid:name} or @attr{uuid}
+func (p *Parser) parseAttribute() (*Node, error) {
+	line, column := p.line, p.column
+
+	if !p.match('@') {
+		return nil, p.error("expected '@' at start of attribute")
+	}
+	p.advance() // consume '@'
+
+	// Expect 'attr{'
+	if !p.matchSequence("attr{") {
+		return nil, p.error("expected 'attr{' after '@'")
+	}
+	p.advanceN(5) // consume 'attr{'
+
+	// Read until '}' or ':'
+	var attrID strings.Builder
+	for !p.isEOF() && !p.match('}') && !p.match(':') {
+		attrID.WriteRune(p.peek())
+		p.advance()
+	}
+
+	if attrID.Len() == 0 {
+		return nil, p.error("expected attribute ID")
+	}
+
+	node := &Node{
+		Type:        AttributeNode,
+		Value:       fmt.Sprintf("@attr{%s}", attrID.String()), // Will be updated if name provided
+		Line:        line,
+		Column:      column,
+		AttributeID: attrID.String(),
+	}
+
+	// Check if there's a human-readable name after ':'
+	if p.match(':') {
+		p.advance() // consume ':'
+
+		var name strings.Builder
+		for !p.isEOF() && !p.match('}') {
+			name.WriteRune(p.peek())
+			p.advance()
+		}
+
+		if name.Len() == 0 {
+			return nil, p.error("expected attribute name after ':'")
+		}
+
+		node.Name = name.String()
+		node.Value = fmt.Sprintf("@attr{%s:%s}", attrID.String(), name.String())
+	}
+
+	if !p.match('}') {
+		return nil, p.error("expected '}' to close attribute")
+	}
+	p.advance() // consume '}'
+
+	return node, nil
+}
+
+// matchSequence checks if the input matches a sequence of characters
+func (p *Parser) matchSequence(seq string) bool {
+	for i, r := range seq {
+		if p.pos+i >= len(p.input) || rune(p.input[p.pos+i]) != r {
+			return false
+		}
+	}
+	return true
+}
+
+// advanceN advances the parser position by n characters
+func (p *Parser) advanceN(n int) {
+	for i := 0; i < n && !p.isEOF(); i++ {
+		p.advance()
+	}
+}
+
 // isIdentifierChar checks if a rune is valid in an identifier
 func (p *Parser) isIdentifierChar(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '-' || r == '_'
@@ -433,14 +521,21 @@ func (ast *AST) ExtractVerbs() []string {
 	return verbs
 }
 
-// ExtractAttributeIDs extracts all attribute IDs from the AST (attr-id values)
+// ExtractAttributeIDs extracts all attribute IDs from the AST (both old attr-id and new @attr syntax)
 func (ast *AST) ExtractAttributeIDs() []string {
 	attrIDs := make([]string, 0)
+	seen := make(map[string]bool)
+
 	ast.traverse(ast.Root, func(node *Node) {
-		// Look for pattern: (var (attr-id "uuid"))
+		// New @attr{uuid:name} syntax
+		if node.Type == AttributeNode && node.AttributeID != "" && !seen[node.AttributeID] {
+			attrIDs = append(attrIDs, node.AttributeID)
+			seen[node.AttributeID] = true
+			return
+		}
+
+		// Legacy patterns: (var (attr-id "uuid")) and (bind (attr-id "uuid") ...)
 		if node.Type == ExpressionNode && len(node.Children) >= 2 {
-			// Check if this is a (var ...) expression
-			// Note: First child is VerbNode for verbs, but could be IdentifierNode in some contexts
 			firstChild := node.Children[0]
 			if (firstChild.Type == VerbNode || firstChild.Type == IdentifierNode) && firstChild.Value == "var" {
 				// Look for nested (attr-id "uuid") expression
@@ -448,8 +543,9 @@ func (ast *AST) ExtractAttributeIDs() []string {
 					if child.Type == ExpressionNode && len(child.Children) >= 2 {
 						attrChild := child.Children[0]
 						if (attrChild.Type == VerbNode || attrChild.Type == IdentifierNode) && attrChild.Value == "attr-id" {
-							if len(child.Children) > 1 && child.Children[1].Type == StringNode {
+							if len(child.Children) > 1 && child.Children[1].Type == StringNode && !seen[child.Children[1].Value] {
 								attrIDs = append(attrIDs, child.Children[1].Value)
+								seen[child.Children[1].Value] = true
 							}
 						}
 					}
@@ -461,8 +557,9 @@ func (ast *AST) ExtractAttributeIDs() []string {
 					if child.Type == ExpressionNode && len(child.Children) >= 2 {
 						attrChild := child.Children[0]
 						if (attrChild.Type == VerbNode || attrChild.Type == IdentifierNode) && attrChild.Value == "attr-id" {
-							if len(child.Children) > 1 && child.Children[1].Type == StringNode {
+							if len(child.Children) > 1 && child.Children[1].Type == StringNode && !seen[child.Children[1].Value] {
 								attrIDs = append(attrIDs, child.Children[1].Value)
+								seen[child.Children[1].Value] = true
 							}
 						}
 					}
@@ -471,6 +568,33 @@ func (ast *AST) ExtractAttributeIDs() []string {
 		}
 	})
 	return attrIDs
+}
+
+// ExtractAttributes extracts all attribute references from the AST with their metadata
+func (ast *AST) ExtractAttributes() []AttributeReference {
+	attributes := make([]AttributeReference, 0)
+	seen := make(map[string]bool)
+
+	ast.traverse(ast.Root, func(node *Node) {
+		if node.Type == AttributeNode && !seen[node.AttributeID] {
+			attributes = append(attributes, AttributeReference{
+				ID:     node.AttributeID,
+				Name:   node.Name,
+				Line:   node.Line,
+				Column: node.Column,
+			})
+			seen[node.AttributeID] = true
+		}
+	})
+	return attributes
+}
+
+// AttributeReference represents an attribute reference found in the DSL
+type AttributeReference struct {
+	ID     string
+	Name   string
+	Line   int
+	Column int
 }
 
 // traverse performs depth-first traversal of the AST
